@@ -52,6 +52,9 @@ char buf[1000]; /* buffer for string the server sends */
 int connectionArray[40];
 int numCon = 0;
 int sd2=-1; /* socket descriptors */
+// keeps all user's information
+userInfo users[MAX_THREAD];
+
 int main(int argc, char const *argv[])
 {
 	struct hostent *ptrh; /* pointer to a host table entry */
@@ -64,8 +67,8 @@ int main(int argc, char const *argv[])
 	int i=0;
 	int pid;
 	int thr_err;
+	zeroStatus(users,MAX_USERS);
 	
-	userInfo users[MAX_THREAD];
 	
 	memset((char *)&sad,0,sizeof(sad)); /* clear sockaddr structure */
 	sad.sin_family = AF_INET; /* set family to Internet */
@@ -184,9 +187,38 @@ void * socRead(void * args)
 		{
 			if(strncmp(buf,"/lg",3) == 0)
 			{
+				char name[20];
+				int index = -1;
+				memcpy(name,buf+3,strlen(buf+3));
 				//this a login cmd
 				//store address
-				printf("This is a login\n");
+				//checks if the user exists
+				index = getUserByName(users,name,MAX_USERS);
+				if ( index == -1)
+				{
+					//add user info
+					index = findNiceSpot(users,MAX_USERS);
+					if( index != -1)
+					{
+						//index is a free spot - filling it with an information
+						memcpy(users[index].name,name,strlen(name)*sizeof(char));
+						users[index].status = 1;
+						users[index].socketHandler = sd2;
+						printAllListInfo(users, MAX_USERS);
+					}
+					else
+					{
+						printf("Server Full: %s \n", name );
+						// TODO: it can be extended here to reply with an error msg
+						closesocket(sd);
+					}	
+
+				}
+				else
+				{
+					users[index].status = 1;
+				}
+
 
 			}
 			if((!strcmp(buf,"server exit"))|| exitFlag)
