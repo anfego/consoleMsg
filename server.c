@@ -48,7 +48,6 @@ int sd;
 pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_t usersThrd[MAX_THREAD], sendAllThrd;
 
-char buf[1000]; /* buffer for string the server sends */
 int connectionArray[40];
 int numCon = 0;
 int sd2=-1; /* socket descriptors */
@@ -173,6 +172,7 @@ int main(int argc, char const *argv[])
 
 void * socRead(void * args)
 {
+	char buf[1000]; /* buffer for string the server sends */
 	struct sbuf_t targ = *(struct sbuf_t *) args;
 	int sd2 = targ.sda;
 	int myId = targ.numCon;
@@ -204,51 +204,49 @@ void * socRead(void * args)
 						memcpy(users[index].name,name,strlen(name)*sizeof(char));
 						users[index].status = 1;
 						users[index].socketHandler = sd2;
-						printAllListInfo(users, MAX_USERS);
 					}
 					else
 					{
 						printf("Server Full: %s \n", name );
 						// TODO: it can be extended here to reply with an error msg
 						closesocket(sd);
-					}	
+					}	 	
 
 				}
 				else
 				{
 					users[index].status = 1;
 				}
-
-
+				printAllListInfo(users, MAX_USERS);
 			}
-			if((!strcmp(buf,"server exit"))|| exitFlag)
-			{
-				printf("\nCought exit signal...\n");
-				exitFlag = 1;
-				closeAll();
-				printf("exiting.");
-				printf(" .\n");
-				fflush(stdout);
-				sleep(1);
-				pthread_exit((void*)0);
-			}
-			if(!strcmp(buf,"exit"))
-			{
-				/*kill current connection*/
-				printf("Client exiting.");
-				pthread_mutex_lock(&buffer_mutex);
-				closesocket(sd2);
-				for (i = myId; i < numCon-1; ++i)
-				{
-					connectionArray[i] = connectionArray[i+1];
-				}
-				numCon--;
-				pthread_mutex_unlock(&buffer_mutex);
-				printf("Now I have %d conections\n", numCon);
-				fflush(stdout);
-				sleep(1);
-				pthread_exit((void*)0);
-			}
+			// if((!strcmp(buf,"server exit"))|| exitFlag)
+			// {
+			// 	printf("\nCought exit signal...\n");
+			// 	exitFlag = 1;
+			// 	closeAll();
+			// 	printf("exiting.");
+			// 	printf(" .\n");
+			// 	fflush(stdout);
+			// 	sleep(1);
+			// 	pthread_exit((void*)0);
+			// }
+			// if(!strcmp(buf,"exit"))
+			// {
+			// 	/*kill current connection*/
+			// 	printf("Client exiting.");
+			// 	pthread_mutex_lock(&buffer_mutex);
+			// 	closesocket(sd2);
+			// 	for (i = myId; i < numCon-1; ++i)
+			// 	{
+			// 		connectionArray[i] = connectionArray[i+1];
+			// 	}
+			// 	numCon--;
+			// 	pthread_mutex_unlock(&buffer_mutex);
+			// 	printf("Now I have %d conections\n", numCon);
+			// 	fflush(stdout);
+			// 	sleep(1);
+			// 	pthread_exit((void*)0);
+			// }
 			
 			printf("\033[22;31mclient: \033[22;37m");
 			printf("%s\n",buf);
