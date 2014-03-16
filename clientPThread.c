@@ -273,17 +273,19 @@ void * clientEngine(void * socketIn)
 {
 	int socket = *((int *)socketIn);
 	char buf[140];
-	memset(buf, '\0', 140*sizeof(char));
+	char cmd[4];
 	int n, index;
-
 	char buf2[1000];
-	memset(buf2,'\0',sizeof(buf2));	//clear memory
-	
-	n = recv(socket, buf, sizeof(buf), 0);
+	printf("LISTENING on %d!!!!!\n",socket);	
 	while(1)
+	{
+		memset(buf, '\0', 140*sizeof(char));
+		memset(cmd, '\0', 4*sizeof(char));
+		n = recv(socket, buf, 140*sizeof(char), 0);
+		memcpy(cmd,buf,3*sizeof(char));
 		if(n >0)
 		{
-			printf("\tRecieve: %s\n",buf);
+			printf("\tCMD: %s\n",cmd);
 			if(strncmp(buf,"/ex",3) == 0)
 			{
 				/*kill current connection*/
@@ -326,6 +328,11 @@ void * clientEngine(void * socketIn)
 				}
 
 			}
+			else if(strncmp(buf,"/er",3) == 0)
+			{
+				printf("There was an error, commands not executed!\n");
+			}
 	
 		}
+	}
 }

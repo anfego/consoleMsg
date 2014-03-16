@@ -40,6 +40,7 @@ void * socRead (void * args);
 void * SendAll(void * args);
 void closeAll();
 void rqNewConnection(int socket);
+void sendError(int socket);
 struct sbuf_t{//I used this to pass mutexes and conditions - decided to leave with buffer only
     int 	sda;         /* Buffer array */    
     int 	numCon;     
@@ -175,16 +176,25 @@ int main(int argc, char const *argv[])
 void * socRead(void * args)
 {
 	char buf[1000]; /* buffer for string the server sends */
+	char cmd[4];
 	struct sbuf_t targ = *(struct sbuf_t *) args;
 	int sd2 = targ.sda;
 	int myId = targ.numCon;
 	int i;
 
 	int n = 0;
+	struct sockaddr_storage sender;
+	socklen_t sendsize = sizeof(sender);
+	
 	while (1) 
 	{
-		memset(buf,'\0',sizeof(buf));
-		n = recv(sd2, buf, sizeof(buf), 0);
+		memset(buf,'\0',1000*sizeof(char));
+		memset(cmd,'\0',4*sizeof(char));
+		bzero(&sender, sizeof(sender));
+		//extracts the command from the IN buffer
+		n = recvfrom(sd2, buf, sizeof(buf), 0,(struct sockaddr*)&sender, &sendsize);
+		memcpy(cmd,buf,3*sizeof(char));
+		printf("CMD: %s\n", cmd );
 		if (n > 0)
 		{
 			
@@ -250,6 +260,9 @@ void * socRead(void * args)
 					//accepted
 					rqNewConnection(users[index].socketHandler);
 				}
+				else
+					printf("The User is not Connected\n");
+					sendError(users[0].socketHandler);
 			}
 
 
@@ -318,6 +331,12 @@ void closeAll()
 void rqNewConnection(int socket)
 {
 	char buf2[10] = "/rq";
+	send(socket,buf2,strlen(buf2),0);
+
+}
+void sendError(int socket)
+{
+	char buf2[10] = "/er";
 	send(socket,buf2,strlen(buf2),0);
 
 }
