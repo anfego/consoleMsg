@@ -64,30 +64,34 @@ userInfo users[MAX_USERS]; //store connections
 
 void consoleEngine();
 void * clientEngine(void * socketIn);
+void getMyIp(char * ip, int socket);
+
 //this retunrs a socket descriptor
 int createSocket(char* host);
 
 int openConnection();
 void closeConnection(int socket);
 int login (int socketHandler);
-int sendMsg(char * msg, int socket);
+int sendMsg(char * msg, int socket, char * cmd);
 void * chat(void * args);
 
 int main(int argc, char *argv[])
 {
 	//Zero all connection Status
-	
+	char buf[1000];
 	zeroStatus(users,MAX_USERS);
 
 	if( (users[0].socketHandler = createSocket(argv[1])) < 0 )
 		return 1;
 
 	users[0].status = 1;
-	// users[0].name = "_server_main_";
 
 	login(users[0].socketHandler);
+	printf("Login\n");
+	// users[0].name = "_server_main_";
 	// Create a Pthread to handle commands
 	// create control pthread that will signal to all other threds to exit
+
 	if ((error = pthread_create(&(users[0].userPThread),NULL, clientEngine, (void *)&(users[0].socketHandler) )) != 0) 
 	{
 	 	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
@@ -166,34 +170,35 @@ int createSocket(char* host)
 int login(int socketHandler)
 {
 
-	char buf2[1000];
+	char buf2[500];
+	sendMsg("%",socketHandler,"/lg");
 	
-	struct ifaddrs *addrs, *tmp;
-	getifaddrs(&addrs);
-	int interfacesNum = 0;
-	tmp = addrs;
+	// struct ifaddrs *addrs, *tmp;
+	// getifaddrs(&addrs);
+	// int interfacesNum = 0;
+	// tmp = addrs;
 
-	while (tmp) 
-	{
+	// while (tmp) 
+	// {
 
-	    if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET)
-	    {
-	        struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
-	        if(interfacesNum == 1)
-	        {
-	        	memset(buf2,'\0',sizeof(buf2));	//clear memory
-        		memcpy(buf2,"/lg",sizeof(char)*3);
-        		memcpy(buf2+3,inet_ntoa(pAddr->sin_addr),strlen(inet_ntoa(pAddr->sin_addr)));			//read line	
-        		
-        	}
-	        interfacesNum++;
-	    }
-		tmp = tmp->ifa_next;
+	//     if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET)
+	//     {
+	//         struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
+	//         if(interfacesNum == 1)
+	//         {
+	//         	memset(buf2,'\0',sizeof(buf2));	//clear memory
+ 	//        		memcpy(buf2,"/lg",sizeof(char)*3);
+ 	//        		memcpy(buf2+3,inet_ntoa(pAddr->sin_addr),strlen(inet_ntoa(pAddr->sin_addr)));			//read line	
+ 	       		
+ 	//        	}
+	//         interfacesNum++;
+	//     }
+	// 	tmp = tmp->ifa_next;
 
-	}
+	// }
 
-	freeifaddrs(addrs);
-	send(socketHandler,buf2,strlen(buf2),0);
+	// freeifaddrs(addrs);
+	// send(socketHandler,buf2,strlen(buf2),0);
 
 	return 0;
 }
@@ -202,20 +207,47 @@ void closeConnection(int socket)
 {
 	char buf2[10];
 	printf("Client Exiting\n");
-	memset(buf2,'\0',sizeof(buf2));	//clear memory
-	memcpy(buf2,"/ex",sizeof(char)*3);
-	send(socket,buf2,strlen(buf2),0);
+	sendMsg("%",socket,"/ex");
+
+	// memset(buf2,'\0',sizeof(buf2));	//clear memory
+	// memcpy(buf2,"/ex",sizeof(char)*3);
+	// send(socket,buf2,strlen(buf2),0);
 	if (socket > 0)
 		closesocket(socket);
 }
 
-int sendMsg(char * msg, int socket)
+int sendMsg(char * msg, int socket,char * cmd)
 {
+	char myIp[140];
+	char bufOut[200];
+	
+	memset(bufOut,'\0',200*sizeof(char));
+	
+	getMyIp(myIp,socket);
+	
+	printf("myIp: %s\n", myIp);
+	
+	memcpy(bufOut,cmd,3*sizeof(char));
+	printf("bufOut CMD %s\n", bufOut );
+	
+	memcpy(bufOut+strlen(bufOut),myIp,strlen(myIp)*sizeof(char));
+	printf("bufOut IP %s\n", bufOut );
+
+	memcpy(bufOut+strlen(bufOut),"#",1*sizeof(char));
+	printf("bufOut # %s\n", bufOut );
+	
+	memcpy(bufOut+strlen(bufOut),msg,strlen(msg)*sizeof(char));
+	
+	printf("bufOut LENT %d\n", strlen(bufOut) );
+	send(socket,bufOut,strlen(bufOut),0);
+	
+	printf("\tbufOut Total %s\n", bufOut );
 	return 0;
 }
 void consoleEngine()
 {
 	char buf[140];
+	char destination[140];
 	memset(buf, '\0', 140*sizeof(char));
 	int n, index;
 
@@ -224,7 +256,8 @@ void consoleEngine()
 	// memcpy(buf2,"/nc192.168.4.132",sizeof(char)*16);
 	while(1)	
 	{
-		memset(buf2,0,sizeof(buf2));	//clear memory
+		memset(buf2,0,1000*sizeof(char));	//clear memory
+		memset(destination,0,140*sizeof(char));	//clear memory
 		fgets(buf2,30,stdin);			//read line
 		int i = strlen(buf2)-1;				//delete CRLF
 		if(buf2[i]=='\n') 
@@ -250,6 +283,8 @@ void consoleEngine()
 		else if (strncmp(buf2,"/nc",3) == 0)
 		{
 			int index = -1;
+			memcpy(destination,buf2+3,(strlen(buf2)-3)*sizeof(char));
+			sendMsg(destination,users[0].socketHandler,"/nc");
 			send(users[0].socketHandler, buf2,strlen(buf2),0);
 			// index = findNiceSpot
 			// pthread_create(users.);
@@ -283,7 +318,7 @@ void * clientEngine(void * socketIn)
 		memset(cmd, '\0', 4*sizeof(char));
 		n = recv(socket, buf, 140*sizeof(char), 0);
 		memcpy(cmd,buf,3*sizeof(char));
-		if(n >0)
+		if(n > 0)
 		{
 			printf("\tCMD: %s\n",cmd);
 			if(strncmp(buf,"/ex",3) == 0)
@@ -335,4 +370,59 @@ void * clientEngine(void * socketIn)
 	
 		}
 	}
+}
+
+void getMyIp(char * ip, int socket)
+{
+	// struct sockaddr_in foo;
+	// int len = sizeof(struct sockaddr);
+ //  	getsockname(socket, (struct sockaddr *) &foo, &len);
+ //    fprintf(stderr, "listening on %s:%d\n", inet_ntoa(foo.sin_addr), 
+ //    ntohs(foo.sin_port));
+// assume s is a connected socket
+
+	// socklen_t len;
+	// struct sockaddr_storage addr;
+	// char ipstr[INET6_ADDRSTRLEN];
+	// int port;
+
+	// len = sizeof addr;
+	// getpeername(socket, (struct sockaddr*)&addr, &len);
+
+	// // deal with both IPv4 and IPv6:
+	// if (addr.ss_family == AF_INET) {
+	//     struct sockaddr_in *s = (struct sockaddr_in *)&addr;
+	//     port = ntohs(s->sin_port);
+	//     inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof ipstr);
+	// } 
+	// printf("Peer IP address: %s\n", ipstr);
+	// printf("Peer port      : %d\n", port);
+
+
+
+
+	struct ifaddrs *addrs, *tmp;
+	getifaddrs(&addrs);
+	int interfacesNum = 0;
+	tmp = addrs;
+
+	while (tmp) 
+	{
+
+	if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET)
+	{
+	struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
+	if(interfacesNum == 1)
+	{
+		memset(ip,'\0',140*sizeof(char));	//clear memory
+		memcpy(ip,inet_ntoa(pAddr->sin_addr),strlen(inet_ntoa(pAddr->sin_addr)));			//read line	
+
+	}
+	interfacesNum++;
+	}
+	tmp = tmp->ifa_next;
+
+	}
+
+
 }
