@@ -36,6 +36,8 @@
 #include <string.h>
 #define PROTOPORT 9047 /* default protocol port number */
 //extern int errno;
+#include "userInfo.h"
+
 char localhost[] = "localhost"; /* default host name */
 // pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 // pthread_t usersThrd[MAX_THREAD], sendAllThrd;
@@ -60,8 +62,6 @@ char localhost[] = "localhost"; /* default host name */
 int ConsoleEngine();
 
 void main(int argc, char *argv[])
-//int argc;
-//char *argv[];
 {
 	struct hostent *ptrh; /* pointer to a host table entry */
 	struct protoent *ptrp; /* pointer to a protocol table entry */
@@ -74,6 +74,8 @@ void main(int argc, char *argv[])
 	char buf[1000], buf2[1000]; /* buffer for data from the server */
 	char sent = 0;
 	int i;
+	userInfo users[MAX_USERS];
+
 	#ifdef WIN32
 	WSADATA wsaData;
 	WSAStartup(0x0101, &wsaData);

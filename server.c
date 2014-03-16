@@ -179,50 +179,50 @@ void * socRead(void * args)
 	while (1) 
 	{
 		memset(buf,'\0',sizeof(buf));
-		if(strncmp(buf,"/lg",3))
-		{
-			//this a login cmd
-			//store address
-			printf("This is a login\n");
-
-		}
 		n = recv(sd2, buf, sizeof(buf), 0);
-		if((n>0 && !strcmp(buf,"server exit"))|| exitFlag)
+		if (n > 0)
 		{
-			printf("\nCought exit signal...\n");
-			exitFlag = 1;
-			closeAll();
-			printf("exiting.");
-			printf(" .\n");
-			fflush(stdout);
-			sleep(1);
-			pthread_exit((void*)0);
-		}
-		if(n>0 && !strcmp(buf,"exit"))
-		{
-			/*kill current connection*/
-			printf("Client exiting.");
-			pthread_mutex_lock(&buffer_mutex);
-			closesocket(sd2);
-			for (i = myId; i < numCon-1; ++i)
+			if(strncmp(buf,"/lg",3) == 0)
 			{
-				connectionArray[i] = connectionArray[i+1];
+				//this a login cmd
+				//store address
+				printf("This is a login\n");
+
 			}
-			numCon--;
-			pthread_mutex_unlock(&buffer_mutex);
-			printf("Now I have %d conections\n", numCon);
-			fflush(stdout);
-			sleep(1);
-			pthread_exit((void*)0);
-		}
-		if(n>0)
-		{
+			if((!strcmp(buf,"server exit"))|| exitFlag)
+			{
+				printf("\nCought exit signal...\n");
+				exitFlag = 1;
+				closeAll();
+				printf("exiting.");
+				printf(" .\n");
+				fflush(stdout);
+				sleep(1);
+				pthread_exit((void*)0);
+			}
+			if(!strcmp(buf,"exit"))
+			{
+				/*kill current connection*/
+				printf("Client exiting.");
+				pthread_mutex_lock(&buffer_mutex);
+				closesocket(sd2);
+				for (i = myId; i < numCon-1; ++i)
+				{
+					connectionArray[i] = connectionArray[i+1];
+				}
+				numCon--;
+				pthread_mutex_unlock(&buffer_mutex);
+				printf("Now I have %d conections\n", numCon);
+				fflush(stdout);
+				sleep(1);
+				pthread_exit((void*)0);
+			}
+			
 			printf("\033[22;31mclient: \033[22;37m");
 			printf("%s\n",buf);
 			fflush(stdout);
 			n=0;
 		}
-		
 	}	
 }
 

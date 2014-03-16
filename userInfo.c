@@ -1,5 +1,5 @@
 #include <string.h>
-
+#include "userInfo.h"
 // typedef struct userInfo
 // {
 // 	char name[20];
@@ -14,9 +14,10 @@
 int getConnectedUsers(userInfo * users, int numElements)
 {
 	int counter =0;
-	for (int i = 0; i < numElements; ++i)
+	int i;
+	for (i = 0; i < numElements; ++i)
 	{
-		if(user[i].status == 1)
+		if(users[i].status == 1)
 			counter++;
 	}
 	return counter;
@@ -24,9 +25,10 @@ int getConnectedUsers(userInfo * users, int numElements)
 // return index of a user by its name
 int getUserByName(userInfo * users, char * userName, int numElements)
 {
-	for (int i = 0; i < numElements; ++i)
+	int i;
+	for (i = 0; i < numElements; ++i)
 	{
-		if(!strcmp(user[i].name ,userName))
+		if(!strcmp(users[i].name ,userName))
 			return i;
 	}
 	
@@ -34,11 +36,12 @@ int getUserByName(userInfo * users, char * userName, int numElements)
 
 }
 //
-int isUserConnected(userInfo * users, char * userName)
+int isUserConnected(userInfo * users, char * userName,  int numElements)
 {
-	for (int i = 0; i < numElements; ++i)
+	int i;
+	for (i = 0; i < numElements; ++i)
 	{
-		if(!strcmp(user[i].name ,userName) && user[i].status == 1)
+		if(!strcmp(users[i].name ,userName) && users[i].status == 1)
 			return 1;
 	}
 	

@@ -3,6 +3,7 @@
 
 #include <string.h>
 
+#define MAX_USERS 40
 
 typedef struct userInfo
 {
@@ -15,10 +16,10 @@ typedef struct userInfo
 } userInfo;
 
 // gets the number conneted users
-int getConnectedUsers(userInfo * users);
+int getConnectedUsers(userInfo * users, int lenUsers);
 // return index of a user by its name
-int getUserByName(userInfo * users, char * userName);
-//
-int isUserConnected(userInfo * users, char * userName);
+int getUserByName(userInfo * users, char * userName,int lenUsers);
+//returns the status of a user
+int isUserConnected(userInfo * users, char * userName, int lenUsers);
 
 #endif
