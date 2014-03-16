@@ -43,12 +43,13 @@ int console_Engine();
 
 int main(int argc, char *argv[])
 {
-	console_Engine();
+	int numproc = atoi(argv[1]);
+	console_Engine(numproc);
 	return 0;
 }
 
 
-int console_Engine()
+int console_Engine(int numproc)
 {
 
 	fd_set active_fd_set, read_fd_set, write_fd_set;

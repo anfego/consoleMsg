@@ -26,29 +26,33 @@
 
 #include <stdio.h>
 #include <string.h>
+
+//
+#include "userInfo.h"
 #define PROTOPORT 9047 /* default protocol port number */
 #define QLEN 6 /* size of request queue */
 #define MAX_THREAD 40
+
+
 int visits = 0; /* counts client connections */
 
 void * socRead (void * args);
 void * SendAll(void * args);
 void closeAll();
- struct sbuf_t{//I used this to pass mutexes and conditions - decided to leave with buffer only
+struct sbuf_t{//I used this to pass mutexes and conditions - decided to leave with buffer only
     int 	sda;         /* Buffer array */    
     int 	numCon;     
 } sbuf_t;
 int exitFlag = 0;
 int sd; 
 pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
-	char buf[1000]; /* buffer for string the server sends */
-	int connectionArray[40];
-	int numCon = 0;
-	int sd2=-1; /* socket descriptors */
-	pthread_t usersThrd[MAX_THREAD], sendAllThrd;
-main(argc, argv)
-int argc;
-char *argv[];
+pthread_t usersThrd[MAX_THREAD], sendAllThrd;
+
+char buf[1000]; /* buffer for string the server sends */
+int connectionArray[40];
+int numCon = 0;
+int sd2=-1; /* socket descriptors */
+int main(int argc, char const *argv[])
 {
 	struct hostent *ptrh; /* pointer to a host table entry */
 	struct protoent *ptrp; /* pointer to a protocol table entry */
@@ -60,6 +64,8 @@ char *argv[];
 	int i=0;
 	int pid;
 	int thr_err;
+	
+	userInfo users[MAX_THREAD];
 	
 	memset((char *)&sad,0,sizeof(sad)); /* clear sockaddr structure */
 	sad.sin_family = AF_INET; /* set family to Internet */
@@ -115,7 +121,8 @@ char *argv[];
 		exit(EXIT_FAILURE);
 	}
 
-			printf("I'm waiting for connections ...\n");
+	printf("I'm waiting for connections ...\n");
+	
 	while(!exitFlag)
 	{
 		if(numCon < 40)
@@ -134,14 +141,13 @@ char *argv[];
 				sbuf_t.numCon = numCon;
 				//printf("\nbefore creation\n");
 					//fflush(stdout);
-				if ((thr_err = pthread_create(&usersThrd[numCon],NULL, socRead, &sbuf_t)) != 0) 
+				if ((thr_err = pthread_create(&usersThrd[numCon],NULL, socRead   , &sbuf_t)) != 0) 
 				{
            		 	fprintf(stderr, "Err. pthread_create() %s\n", strerror(thr_err));
             		exit(EXIT_FAILURE);
         		}
-				connectionArray[numCon] = sd2;
-				numCon++;
-				
+				connectionArray[numCon++] = sd2;
+								
 				pthread_mutex_unlock(&buffer_mutex);
 
 				printf("I received one connection. Now I have %d conections\n", numCon);
@@ -159,7 +165,7 @@ char *argv[];
 	///JOIN here
 	closesocket(sd2);
 	wait();
-	exit(0);
+	return 0;
 }
 
 void * socRead(void * args)
@@ -170,47 +176,54 @@ void * socRead(void * args)
 	int i;
 
 	int n = 0;
-		memset(buf,0,sizeof(buf));
-		while (1) 
+	while (1) 
+	{
+		memset(buf,'\0',sizeof(buf));
+		if(strncmp(buf,"/lg",3))
 		{
-			n = recv(sd2, buf, sizeof(buf), 0);
-			if((n>0 && !strcmp(buf,"server exit"))|| exitFlag)
+			//this a login cmd
+			//store address
+			printf("This is a login\n");
+
+		}
+		n = recv(sd2, buf, sizeof(buf), 0);
+		if((n>0 && !strcmp(buf,"server exit"))|| exitFlag)
+		{
+			printf("\nCought exit signal...\n");
+			exitFlag = 1;
+			closeAll();
+			printf("exiting.");
+			printf(" .\n");
+			fflush(stdout);
+			sleep(1);
+			pthread_exit((void*)0);
+		}
+		if(n>0 && !strcmp(buf,"exit"))
+		{
+			/*kill current connection*/
+			printf("Client exiting.");
+			pthread_mutex_lock(&buffer_mutex);
+			closesocket(sd2);
+			for (i = myId; i < numCon-1; ++i)
 			{
-				printf("\nCought exit signal...\n");
-				exitFlag = 1;
-				closeAll();
-				printf("exiting.");
-				printf(" .\n");
-				fflush(stdout);
-				sleep(1);
-				pthread_exit((void*)0);
+				connectionArray[i] = connectionArray[i+1];
 			}
-			if(n>0 && !strcmp(buf,"exit"))
-			{
-				/*kill current connection*/
-				printf("Client exiting.");
-				pthread_mutex_lock(&buffer_mutex);
-				closesocket(sd2);
-				for (i = myId; i < numCon-1; ++i)
-				{
-					connectionArray[i] = connectionArray[i+1];
-				}
-				numCon--;
-				pthread_mutex_unlock(&buffer_mutex);
-				printf("Now I have %d conections\n", numCon);
-				fflush(stdout);
-				sleep(1);
-				pthread_exit((void*)0);
-			}
-			if(n>0)
-			{
-				printf("\033[22;31mclient: \033[22;37m");
-				printf("%s\n",buf);
-				fflush(stdout);
-				memset(buf,0,sizeof(buf));
-				n=0;
-			}
-		}	
+			numCon--;
+			pthread_mutex_unlock(&buffer_mutex);
+			printf("Now I have %d conections\n", numCon);
+			fflush(stdout);
+			sleep(1);
+			pthread_exit((void*)0);
+		}
+		if(n>0)
+		{
+			printf("\033[22;31mclient: \033[22;37m");
+			printf("%s\n",buf);
+			fflush(stdout);
+			n=0;
+		}
+		
+	}	
 }
 
 void * SendAll(void * args)

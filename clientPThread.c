@@ -26,8 +26,12 @@
 #define closesocket close
 #include <sys/types.h>
 #include <sys/socket.h>
+
+#include <ifaddrs.h>	
+				
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,174 +42,142 @@
 //extern int errno;
 char localhost[] = "localhost"; /* default host name */
 // pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
-// pthread_t usersThrd[MAX_THREAD], sendAllThrd;
-/*------------------------------------------------------------------------
-* Program: client
-*
-* Purpose: allocate a socket, connect to a server, and print all output
-*
-* Syntax: client [ host [port] ]
-*
-* host - name of a computer on which server is executing
-* port - protocol port number server is using
-*
-* Note: Both arguments are optional. If no host name is specified,
-* the client uses "localhost"; if no protocol port is
-* specified, the client uses the default given by PROTOPORT.
-*
-*------------------------------------------------------------------------
-*/
+pthread_t  sendAllThrd;// usersThrd[MAX_THREAD],
+int newConnection = 0;//new connection flag: 1 - if a new connection is to be established;
+int CurrConnIDX = 0; // counts latest element in pthread array
+int error = 0;//use for phtread error during creation
 
 // Helper Funtions
-int ConsoleEngine();
 
-void main(int argc, char *argv[])
+int ConsoleEngine();
+//this retunrs a socket descriptor
+int createSocket(char* host);
+
+int openConnection();
+int login (int socketHandler);
+
+int main(int argc, char *argv[])
 //int argc;
 //char *argv[];
+{
+	int socketHandler = -1;
+	if( (socketHandler = createSocket(argv[1])) < 0 )
+		return 1;
+	if ( !login(socketHandler) )
+		return 1;
+	
+	if (socketHandler > 0)
+		closesocket(socketHandler);
+
+
+	// create control pthread that will signal to all other threds to exit
+	// if ((error = pthread_create(&sendAllThrd,NULL, signalThreadfunc, NULL)) != 0) 
+	// {
+	//  	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
+	// 	exit(EXIT_FAILURE);
+	// }
+	// // create pthread for particular connection
+	// while(1)
+	// {
+	// 	if(newConnection)
+	// 	{
+	// 		pthreadArray[CurrConnIDX++] = pthread_create......
+	// 	}
+	return 0;
+}
+int createSocket(char* host)
 {
 	struct hostent *ptrh; /* pointer to a host table entry */
 	struct protoent *ptrp; /* pointer to a protocol table entry */
 	struct sockaddr_in sad; /* structure to hold an IP address */
 	int sd; /* socket descriptor */
-	int port; /* protocol port number */
-	char *host; /* pointer to host name */
+	int port = PROTOPORT; /* protocol port number */
+	
 	int n; /* number of characters read */
 	int pid;
 	char buf[1000], buf2[1000]; /* buffer for data from the server */
 	char sent = 0;
 	int i;
-	#ifdef WIN32
-	WSADATA wsaData;
-	WSAStartup(0x0101, &wsaData);
-	#endif
-	memset((char *)&sad,0,sizeof(sad)); /* clear sockaddr structure */
+	int error = 0;
+	// clear sockaddr structure
+	memset((char *)&sad,0,sizeof(sad)); 
+	
 	sad.sin_family = AF_INET; /* set family to Internet */
 	/* Check command-line argument for protocol port and extract */
 	/* port number if one is specified. Otherwise, use the default */
 	/* port value given by constant PROTOPORT */
-	if (argc > 2) 
-	{ /* if protocol port specified */
-		port = atoi(argv[2]); /* convert to binary */
-	} 
-	else 
-	{
-		port = PROTOPORT; /* use default port number */
-	}
-	if (port > 0) /* test for legal value */
-		sad.sin_port = htons((u_short)port);
-	else 
-	{ 
-		/* print error message and exit */
-		fprintf(stderr,"bad port number %s\n",argv[2]);
-		exit(1);
 
-	}
+	 /* test for legal value */
+	sad.sin_port = htons((u_short)port);
+	
 	/* Check host argument and assign host name. */
 
-
-	if (argc > 1) 
-	{
-		
-		host = argv[1]; /* if host argument specified */
-	} 
-	else 
-	{
-		host = localhost;
-	}
 	/* Convert host name to equivalent IP address and copy to sad. */
 	ptrh = gethostbyname(host);
+
 	if ( ((char *)ptrh) == NULL ) 
 	{
 		fprintf(stderr,"invalid host: %s\n", host);
-		exit(1);
+		return -1;
 	}
 	memcpy(&sad.sin_addr, ptrh->h_addr, ptrh->h_length);
 	/* Map TCP transport protocol name to protocol number. */
 	if ( ((int)(ptrp = getprotobyname("tcp"))) == 0) 
 	{
 		fprintf(stderr, "cannot map \"tcp\" to protocol number");
-		exit(1);
+		return -1;
 	}
 	/* Create a socket. */
 	sd = socket(PF_INET, SOCK_STREAM, ptrp->p_proto);
+
 	if (sd < 0) 
 	{
 		fprintf(stderr, "socket creation failed\n");
-		exit(1);
+		return -1;
 	}
 	/* Connect the socket to the specified server. */
 	if (connect(sd, (struct sockaddr *)&sad, sizeof(sad)) < 0) 
 	{
 		fprintf(stderr,"connect failed\n");
-		exit(1);
+		return -1;
 	}
-	memset(buf,0,sizeof(buf));
-	memset(buf2,0,sizeof(buf2));
-	
-	// if ((error = pthread_create(&sendAllThrd,NULL, SendAll, NULL)) != 0) 
-	// {
-	//  	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
-	// 	exit(EXIT_FAILURE);
-	// }
-	pid = fork();
-	if (pid > 0)
-	{
-		/* Repeatedly read data from socket and write to user's screen. */
-		while(1)
-		{
-			memset(buf2,0,sizeof(buf2));
-			fgets(buf2,30,stdin); 
-			i = strlen(buf2)-1;
-			if(buf2[i]=='\n') 
-				buf2[i] = '\0';
-			send(sd,buf2,strlen(buf2),0);
-			if(!strcmp(buf2,"exit"))
-			{
-				closesocket(sd);	
-				printf("\nExiting...\n");
-				printf("PARENT:Waiting for all children to exit\n");
-				kill(pid,9);
-				break;
-			}
-		}
-	}
-	else
-	{
-		while(1)
-		{
-			
-			n = recv(sd, buf, sizeof(buf), 0);
-
-			if(n>0 && !strcmp(buf,"exit"))
-			{
-				/*kill current connection*/
-				printf("exiting.");
-				closesocket(sd);
-				printf(" .\n");
-				fflush(stdout);
-				exit(0);
-			}
-			if(n>0)
-			{
-				printf("\033[22;31mserver: \033[22;37m");
-				printf("%s\n",buf);
-				fflush(stdout);
-				memset(buf,0,sizeof(buf));
-			}
-			
-		}
-		
-	
-	}
-	fflush(stdout);
-	/* Close the socket. */
-	/* Terminate the client program gracefully. */
-	exit(0);
+	return sd;
 }
-
-//handles the comands requested by the user 
-//Returns 0 if success
-int ConsoleEngine ()
+int login(int socketHandler)
 {
+
+	char buf2[1000];
+	
+	struct ifaddrs *addrs, *tmp;
+	getifaddrs(&addrs);
+	int interfacesNum = 0;
+	tmp = addrs;
+
+	while (tmp) 
+	{
+
+	    if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET)
+	    {
+	        struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
+	        if(interfacesNum == 1)
+	        {
+	        	memset(buf2,'\0',sizeof(buf2));	//clear memory
+        		memcpy(buf2,"/lg",sizeof(char)*3);
+        		memcpy(buf2+3,inet_ntoa(pAddr->sin_addr),strlen(inet_ntoa(pAddr->sin_addr)));			//read line	
+        		
+        		
+        		
+
+	        	
+	        }
+	        interfacesNum++;
+	    }
+		tmp = tmp->ifa_next;
+
+	}
+
+	freeifaddrs(addrs);
+	send(socketHandler,buf2,strlen(buf2),0);
+
 	return 0;
 }
