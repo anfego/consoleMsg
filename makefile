@@ -9,9 +9,10 @@ AFLAGS = rf
 
 
 all: server.c client.c
-	$(CC) userInfo.c -c 
+	$(CC) communications.c -c
+	$(CC) userInfo.c -c -lpthread
 	$(CC) server.c  userInfo.o -o server.e  -lpthread
-	$(CC) clientPThread.c userInfo.o -o client.e  -lpthread
+	$(CC) clientPThread.c userInfo.o communications.o -o client.e  -lpthread
 	# gcc client.c -o client
 clean:
 	rm -f *.e *.o 

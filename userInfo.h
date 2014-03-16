@@ -2,6 +2,7 @@
 #define USER_H
 
 #include <string.h>
+#include <pthread.h>	// use thread functions
 
 #define MAX_USERS 40
 
@@ -12,6 +13,8 @@ typedef struct userInfo
 	//int port;
 	int socketHandler;
 	int status;	//0 is not conected 1: is connected
+	pthread_t userPThread;
+
 
 
 } userInfo;
@@ -29,4 +32,6 @@ void zeroStatus(userInfo *  users,int numElements);
 int findNiceSpot(userInfo * users,int numElements);
 
 void printAllListInfo(userInfo * users,int numElements);
+void printUserInfo(userInfo * user);
+
 #endif

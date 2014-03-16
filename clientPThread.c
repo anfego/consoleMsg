@@ -38,6 +38,12 @@
 #endif
 #include <stdio.h>
 #include <string.h>
+//Project Libraries
+#include "userInfo.h"
+#include "communications.h"
+
+
+
 #define PROTOPORT 9047 /* default protocol port number */
 //extern int errno;
 char localhost[] = "localhost"; /* default host name */
@@ -47,42 +53,56 @@ int newConnection = 0;//new connection flag: 1 - if a new connection is to be es
 int CurrConnIDX = 0; // counts latest element in pthread array
 int error = 0;//use for phtread error during creation
 
+
+pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_t usersThrd[MAX_USERS], sendAllThrd;
+
+
+userInfo users[MAX_USERS]; //store connections
+
 // Helper Funtions
 
-int ConsoleEngine();
+void consoleEngine();
+void * clientEngine(void * socketIn);
 //this retunrs a socket descriptor
 int createSocket(char* host);
 
 int openConnection();
+void closeConnection(int socket);
 int login (int socketHandler);
+int sendMsg(char * msg, int socket);
+void * chat(void * args);
 
 int main(int argc, char *argv[])
-//int argc;
-//char *argv[];
 {
-	int socketHandler = -1;
-	if( (socketHandler = createSocket(argv[1])) < 0 )
-		return 1;
-	if ( !login(socketHandler) )
-		return 1;
+	//Zero all connection Status
 	
-	if (socketHandler > 0)
-		closesocket(socketHandler);
+	zeroStatus(users,MAX_USERS);
 
+	if( (users[0].socketHandler = createSocket(argv[1])) < 0 )
+		return 1;
 
+	users[0].status = 1;
+	// users[0].name = "_server_main_";
+
+	login(users[0].socketHandler);
+	// Create a Pthread to handle commands
 	// create control pthread that will signal to all other threds to exit
-	// if ((error = pthread_create(&sendAllThrd,NULL, signalThreadfunc, NULL)) != 0) 
-	// {
-	//  	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
-	// 	exit(EXIT_FAILURE);
-	// }
-	// // create pthread for particular connection
-	// while(1)
-	// {
-	// 	if(newConnection)
-	// 	{
-	// 		pthreadArray[CurrConnIDX++] = pthread_create......
-	// 	}
+	if ((error = pthread_create(&(users[0].userPThread),NULL, clientEngine, (void *)&(users[0].socketHandler) )) != 0) 
+	{
+	 	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
+		exit(EXIT_FAILURE);
+	}
+
+	consoleEngine();
+
+	
+	
+	
+	printf("\tBye\n");
+
+
+
 	return 0;
 }
 int createSocket(char* host)
@@ -165,11 +185,7 @@ int login(int socketHandler)
         		memcpy(buf2,"/lg",sizeof(char)*3);
         		memcpy(buf2+3,inet_ntoa(pAddr->sin_addr),strlen(inet_ntoa(pAddr->sin_addr)));			//read line	
         		
-        		
-        		
-
-	        	
-	        }
+        	}
 	        interfacesNum++;
 	    }
 		tmp = tmp->ifa_next;
@@ -180,4 +196,136 @@ int login(int socketHandler)
 	send(socketHandler,buf2,strlen(buf2),0);
 
 	return 0;
+}
+
+void closeConnection(int socket)
+{
+	char buf2[10];
+	printf("Client Exiting\n");
+	memset(buf2,'\0',sizeof(buf2));	//clear memory
+	memcpy(buf2,"/ex",sizeof(char)*3);
+	send(socket,buf2,strlen(buf2),0);
+	if (socket > 0)
+		closesocket(socket);
+}
+
+int sendMsg(char * msg, int socket)
+{
+	return 0;
+}
+void consoleEngine()
+{
+	char buf[140];
+	memset(buf, '\0', 140*sizeof(char));
+	int n, index;
+
+	char buf2[1000];
+	memset(buf2,'\0',sizeof(buf2));	//clear memory
+	// memcpy(buf2,"/nc192.168.4.132",sizeof(char)*16);
+	while(1)	
+	{
+		memset(buf2,0,sizeof(buf2));	//clear memory
+		fgets(buf2,30,stdin);			//read line
+		int i = strlen(buf2)-1;				//delete CRLF
+		if(buf2[i]=='\n') 
+			buf2[i] = '\0';
+	
+		if(!strcmp(buf2,"/ex"))
+		{							//check for exit token
+			for (i = MAX_USERS-1; i >= 0; --i)
+			{							//send to all clients
+				// send(connectionArray[i],buf2,strlen(buf2),0);
+				if(users[i].status == 1)
+				{
+					pthread_cancel(users[i].userPThread);
+					closeConnection(users[i].socketHandler);
+				}
+
+				
+			}
+
+			fflush(stdout);
+			exit(0);
+		}
+		else if (strncmp(buf2,"/nc",3) == 0)
+		{
+			int index = -1;
+			send(users[0].socketHandler, buf2,strlen(buf2),0);
+			// index = findNiceSpot
+			// pthread_create(users.);
+			//TODO: Create a Pthread to handle new connection
+		}
+		
+		// 	printf("\033[22;31mserver: \033[22;37m");
+			printf("%s\n",buf);
+			fflush(stdout);
+			memset(buf,0,sizeof(buf));
+		
+	}
+
+}
+void * chat (void * args)
+{
+
+
+}
+void * clientEngine(void * socketIn)
+{
+	int socket = *((int *)socketIn);
+	char buf[140];
+	memset(buf, '\0', 140*sizeof(char));
+	int n, index;
+
+	char buf2[1000];
+	memset(buf2,'\0',sizeof(buf2));	//clear memory
+	
+	n = recv(socket, buf, sizeof(buf), 0);
+	while(1)
+		if(n >0)
+		{
+			printf("\tRecieve: %s\n",buf);
+			if(strncmp(buf,"/ex",3) == 0)
+			{
+				/*kill current connection*/
+				printf("exiting.");
+				closesocket(socket);
+				printf(" .\n");
+				fflush(stdout);
+				break;
+
+			}
+			if(strncmp(buf,"/rq",3) == 0)
+			{
+				if(getConnectedUsers(users,MAX_USERS)< MAX_USERS)
+				{
+					//connection can be stablished
+						// create control pthread that will signal to all other threds to exit
+					int port = 0;
+					index = findNiceSpot(users,MAX_USERS);
+
+					users[index].socketHandler = New_Socket(&port);
+
+					printf("\tThis is the new socket: %d\n", users[0].socketHandler);
+					printf("\tThis is the new socket: %d\n", users[index].socketHandler);
+
+					// if ((error = pthread_create(&(users[index].userPThread),NULL, chat, NULL)) != 0) 
+					// {
+					//  	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
+					// 	exit(EXIT_FAILURE);
+					// }
+					// // create pthread for particular connection
+					// while(1)
+					// {
+					// 	if(newConnection)
+					// 	{
+					// 		pthreadArray[CurrConnIDX++] = pthread_create......
+					// 	}
+					closesocket(users[index].socketHandler);
+					break;
+
+				}
+
+			}
+	
+		}
 }

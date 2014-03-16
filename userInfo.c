@@ -43,7 +43,7 @@ int isUserConnected(userInfo * users, char * userName,  int numElements)
 	for (i = 0; i < numElements; ++i)
 	{
 		if(!strcmp((users+i)->name ,userName) && (users+i)->status == 1)
-			return 1;
+			return i;
 	}
 	
 	return -1;
@@ -64,7 +64,6 @@ int findNiceSpot(userInfo * users,int numElements)
 	int i;
 	for (i = 0; i < numElements; ++i)
 	{
-		printf("actual status %d, I is %d\n",(users+i)->status, i );
 		if((users+i)->status == 0)
 			return i;
 	}	
@@ -77,7 +76,12 @@ void printAllListInfo(userInfo * users,int numElements)
 	int i;
 	for (i = 0; i < numElements; ++i)
 	{
-		printf("User: %s, socket: %d, status: %d \n",(users+i)->name, (users+i)->socketHandler, (users+i)->status );
+		printUserInfo(users+i);
+		// printf("User: %s, socket: %d, status: %d \n",(users+i)->name, (users+i)->socketHandler, (users+i)->status );
 	}	
 
+}
+void printUserInfo(userInfo * user)
+{
+	printf("User: %s, socket: %d, status: %d \n",user->name, user->socketHandler, user->status );
 }

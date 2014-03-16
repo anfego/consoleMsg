@@ -39,6 +39,7 @@ int visits = 0; /* counts client connections */
 void * socRead (void * args);
 void * SendAll(void * args);
 void closeAll();
+void rqNewConnection(int socket);
 struct sbuf_t{//I used this to pass mutexes and conditions - decided to leave with buffer only
     int 	sda;         /* Buffer array */    
     int 	numCon;     
@@ -53,6 +54,7 @@ int numCon = 0;
 int sd2=-1; /* socket descriptors */
 // keeps all user's information
 userInfo users[MAX_THREAD];
+
 
 int main(int argc, char const *argv[])
 {
@@ -185,10 +187,12 @@ void * socRead(void * args)
 		n = recv(sd2, buf, sizeof(buf), 0);
 		if (n > 0)
 		{
+			
+			int index = -1;
+			char name[20];
+			//this is a login
 			if(strncmp(buf,"/lg",3) == 0)
 			{
-				char name[20];
-				int index = -1;
 				memcpy(name,buf+3,strlen(buf+3));
 				//this a login cmd
 				//store address
@@ -217,38 +221,42 @@ void * socRead(void * args)
 				{
 					users[index].status = 1;
 				}
-				printAllListInfo(users, MAX_USERS);
+				printUserInfo(&users[index]);
 			}
-			// if((!strcmp(buf,"server exit"))|| exitFlag)
-			// {
-			// 	printf("\nCought exit signal...\n");
-			// 	exitFlag = 1;
-			// 	closeAll();
-			// 	printf("exiting.");
-			// 	printf(" .\n");
-			// 	fflush(stdout);
-			// 	sleep(1);
-			// 	pthread_exit((void*)0);
-			// }
-			// if(!strcmp(buf,"exit"))
-			// {
-			// 	/*kill current connection*/
-			// 	printf("Client exiting.");
-			// 	pthread_mutex_lock(&buffer_mutex);
-			// 	closesocket(sd2);
-			// 	for (i = myId; i < numCon-1; ++i)
-			// 	{
-			// 		connectionArray[i] = connectionArray[i+1];
-			// 	}
-			// 	numCon--;
-			// 	pthread_mutex_unlock(&buffer_mutex);
-			// 	printf("Now I have %d conections\n", numCon);
-			// 	fflush(stdout);
-			// 	sleep(1);
-			// 	pthread_exit((void*)0);
-			// }
+			//this is a client logout
+			else if(strncmp(buf,"/ex",3) == 0)
+			{
+				printf("Client exiting.");
+				pthread_mutex_lock(&buffer_mutex);
+				closesocket(sd2);
+				for (i = myId; i < numCon-1; ++i)
+				{
+					connectionArray[i] = connectionArray[i+1];
+				}
+				numCon--;
+				pthread_mutex_unlock(&buffer_mutex);
+				printf("Now I have %d conections\n", numCon);
+				fflush(stdout);
+				sleep(1);
+				pthread_exit((void*)0);
+			}
+			else if(strncmp(buf,"/nc",3) == 0)
+			{
+				//this a client requesting new chat
+				memcpy(name,buf+3,strlen(buf+3));
+				index = isUserConnected(users,name,MAX_USERS);
+				if(index >= 0)
+				{
+					//accepted
+					rqNewConnection(users[index].socketHandler);
+				}
+			}
+
+
 			
-			printf("\033[22;31mclient: \033[22;37m");
+		// #endregion
+			
+			// printf("\033[22;31mclient: \033[22;37m");
 			printf("%s\n",buf);
 			fflush(stdout);
 			n=0;
@@ -269,13 +277,16 @@ void * SendAll(void * args)
 		i = strlen(buf2)-1;				//delete CRLF
 		if(buf2[i]=='\n') 
 			buf2[i] = '\0';
-		for (i = 0; i < numCon; ++i)
-		{							//send to all clients
-			send(connectionArray[i],buf2,strlen(buf2),0);
-		}
-		if(!strcmp(buf2,"exit")||exitFlag)
+		if(!strcmp(buf2,"exit")|| exitFlag )
 		{							//check for exit token
+			for (i = 0; i < MAX_USERS; ++i)
+			{							//send to all clients
+				// send(connectionArray[i],buf2,strlen(buf2),0);
+				if(users[i].status == 1)
+					send(users[i].socketHandler,"/ex",3*sizeof(char),0);
+			}
 			exitFlag = 1; //let all know that it;s time to exit
+
 			closesocket(sd);
 			sleep(2);
 			printf("exiting with SendAll\n");
@@ -303,4 +314,10 @@ void closeAll()
 	printf("Done closeAll\n");
 	fflush(stdout);
 	exit(0);
+}
+void rqNewConnection(int socket)
+{
+	char buf2[10] = "/rq";
+	send(socket,buf2,strlen(buf2),0);
+
 }
