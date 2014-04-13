@@ -1,4 +1,4 @@
-/**************************************************************************************
+/*************************************************************************************
  FILE NAME:			client.c
  PROGRAMMER:		Ivan Syzonenko
  					Andres F. Gomez
@@ -16,7 +16,7 @@
 					Note: Both arguments are optional. If no host name is specified,
 					the client uses "localhost"; if no protocol port is
 					specified, the client uses the default given by PROTOPORT.
-**************************************************************************************/
+************************************************************************************/
 #ifndef unix
 #define WIN32
 #include <windows.h>
@@ -46,8 +46,9 @@
 
 #define PROTOPORT 9047 /* default protocol port number */
 //extern int errno;
-char localhost[] = "localhost"; /* default host name */
+char localhost[] = "raspberrypi"; /* default host name */
 // pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 pthread_t  sendAllThrd;// usersThrd[MAX_THREAD],
 int newConnection = 0;//new connection flag: 1 - if a new connection is to be established;
 int CurrConnIDX = 0; // counts latest element in pthread array
@@ -64,7 +65,6 @@ userInfo users[MAX_USERS]; //store connections
 
 void consoleEngine();
 void * clientEngine(void * socketIn);
-void getMyIp(char * ip, int socket);
 
 //this retunrs a socket descriptor
 int createSocket(char* host);
@@ -72,7 +72,9 @@ int createSocket(char* host);
 int openConnection();
 void closeConnection(int socket);
 int login (int socketHandler);
+void getMyIp(char * ip, int socket);
 int sendMsg(char * msg, int socket, char * cmd);
+void deserializer(const char * buf,char * source,char * cmd,char * msg);
 void * chat(void * args);
 
 int main(int argc, char *argv[])
@@ -285,7 +287,7 @@ void consoleEngine()
 			int index = -1;
 			memcpy(destination,buf2+3,(strlen(buf2)-3)*sizeof(char));
 			sendMsg(destination,users[0].socketHandler,"/nc");
-			send(users[0].socketHandler, buf2,strlen(buf2),0);
+			// send(users[0].socketHandler, buf2,strlen(buf2),0);
 			// index = findNiceSpot
 			// pthread_create(users.);
 			//TODO: Create a Pthread to handle new connection
@@ -308,20 +310,36 @@ void * clientEngine(void * socketIn)
 {
 	int socket = *((int *)socketIn);
 	char buf[140];
-	char cmd[4];
-	int n, index;
 	char buf2[1000];
+	
+		
+	char cmd[4];
+	char source[20];
+	char msg[140];
+	
+	int n, index;
 	printf("LISTENING on %d!!!!!\n",socket);	
 	while(1)
 	{
 		memset(buf, '\0', 140*sizeof(char));
 		memset(cmd, '\0', 4*sizeof(char));
+
 		n = recv(socket, buf, 140*sizeof(char), 0);
-		memcpy(cmd,buf,3*sizeof(char));
+		
 		if(n > 0)
 		{
-			printf("\tCMD: %s\n",cmd);
-			if(strncmp(buf,"/ex",3) == 0)
+		
+			memset(cmd,'\0',4*sizeof(char));
+			memset(source,'\0',20*sizeof(char));
+			memset(msg,'\0',140*sizeof(char));
+			
+			deserializer(buf,source,cmd,msg);
+			
+			printf("CMD: %s\n", cmd );
+			printf("Source: %s\n", source );
+			printf("MSG: %s\n", msg );
+
+			if(strncmp(cmd,"/ex",3) == 0)
 			{
 				/*kill current connection*/
 				printf("exiting.");
@@ -331,19 +349,26 @@ void * clientEngine(void * socketIn)
 				break;
 
 			}
-			if(strncmp(buf,"/rq",3) == 0)
+			if(strncmp(cmd,"/rq",3) == 0)
 			{
+				// check wheter a new connection is allowed
 				if(getConnectedUsers(users,MAX_USERS)< MAX_USERS)
 				{
 					//connection can be stablished
-						// create control pthread that will signal to all other threds to exit
+					// create control pthread that will signal to all other threds to exit
 					int port = 0;
 					index = findNiceSpot(users,MAX_USERS);
+					// memcpy(buf2,buf+3,strlen(buf+3));
 
 					users[index].socketHandler = New_Socket(&port);
+					
+					printf("\tThis is the new socket: %d for %s\n", users[index].socketHandler,msg);
+					memcpy(buf2,msg,strlen(msg)*sizeof(char));
+					memcpy(buf2+strlen(buf2),"#",sizeof(char));
+					sprintf(buf2+strlen(buf2),"%d",users[index].socketHandler);
 
-					printf("\tThis is the new socket: %d\n", users[0].socketHandler);
-					printf("\tThis is the new socket: %d\n", users[index].socketHandler);
+					sendMsg(buf2,users[0].socketHandler,"/so");
+					// notify the server about the new socket to handle the new connection
 
 					// if ((error = pthread_create(&(users[index].userPThread),NULL, chat, NULL)) != 0) 
 					// {
@@ -363,9 +388,14 @@ void * clientEngine(void * socketIn)
 				}
 
 			}
-			else if(strncmp(buf,"/er",3) == 0)
+			else if(strncmp(cmd,"/er",3) == 0)
 			{
 				printf("There was an error, commands not executed!\n");
+			}
+
+			else if(strncmp(cmd,"/so",3) == 0)
+			{
+				printf("Ok stablish connection to %s\n",msg);
 			}
 	
 		}
@@ -374,32 +404,6 @@ void * clientEngine(void * socketIn)
 
 void getMyIp(char * ip, int socket)
 {
-	// struct sockaddr_in foo;
-	// int len = sizeof(struct sockaddr);
- //  	getsockname(socket, (struct sockaddr *) &foo, &len);
- //    fprintf(stderr, "listening on %s:%d\n", inet_ntoa(foo.sin_addr), 
- //    ntohs(foo.sin_port));
-// assume s is a connected socket
-
-	// socklen_t len;
-	// struct sockaddr_storage addr;
-	// char ipstr[INET6_ADDRSTRLEN];
-	// int port;
-
-	// len = sizeof addr;
-	// getpeername(socket, (struct sockaddr*)&addr, &len);
-
-	// // deal with both IPv4 and IPv6:
-	// if (addr.ss_family == AF_INET) {
-	//     struct sockaddr_in *s = (struct sockaddr_in *)&addr;
-	//     port = ntohs(s->sin_port);
-	//     inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof ipstr);
-	// } 
-	// printf("Peer IP address: %s\n", ipstr);
-	// printf("Peer port      : %d\n", port);
-
-
-
 
 	struct ifaddrs *addrs, *tmp;
 	getifaddrs(&addrs);
@@ -424,5 +428,36 @@ void getMyIp(char * ip, int socket)
 
 	}
 
+
+}
+
+void deserializer(const char * buf,char * source,char * cmd,char * msg)
+{
+	int i;
+	char localBuf[1000];
+	memcpy(localBuf,buf,strlen(buf)*sizeof(char));
+	
+	memcpy(cmd,localBuf,3*sizeof(char));
+
+	for(i=3;i<strlen(localBuf);++i)
+	{
+		// printf("%d %s\n", i,localBuf+i);	
+		if(strncmp(localBuf+i,"#",1) == 0)
+		{
+			break;
+		}
+
+	}
+	if(i == strlen(localBuf))
+	{
+		printf("ERROR!\n");
+		
+	}
+	else
+	{
+		memcpy(source,localBuf+3,(i-3)*sizeof(char));
+		memcpy(msg,localBuf+i+1,strlen(localBuf)*sizeof(char));
+
+	}
 
 }

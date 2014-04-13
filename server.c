@@ -27,8 +27,18 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <ifaddrs.h>	
+				
+
+#include <arpa/inet.h>
+
+
+
+
+
 //
 #include "userInfo.h"
+
 #define PROTOPORT 9047 /* default protocol port number */
 #define QLEN 6 /* size of request queue */
 #define MAX_THREAD 40
@@ -38,9 +48,16 @@ int visits = 0; /* counts client connections */
 
 void * socRead (void * args);
 void * SendAll(void * args);
+
+void getMyIp(char * ip, int socket);
+int sendMsg(char * msg, int socket, char * cmd);
+
+
 void closeAll();
-void rqNewConnection(int socket);
-void deserializer(const char * buf,char * source,char * cmd,char * destination);
+void rqNewConnection(int socket, char *source, int nameLen);
+void deserializer(const char * buf,char * source,char * cmd,char * msg);
+void deserializer2(const char * buf,char * source,char * msg);
+
 void sendError(int socket);
 struct sbuf_t{//I used this to pass mutexes and conditions - decided to leave with buffer only
     int 	sda;         /* Buffer array */    
@@ -177,9 +194,11 @@ int main(int argc, char const *argv[])
 void * socRead(void * args)
 {
 	char buf[1000]; /* buffer for string the server sends */
+	char buf2[1000]; /* buffer for string the server sends */
 	char cmd[4];
 	char source[20];
 	char msg[140];
+	char msg2[1000];
 	struct sbuf_t targ = *(struct sbuf_t *) args;
 	int sd2 = targ.sda;
 	int myId = targ.numCon;
@@ -192,12 +211,14 @@ void * socRead(void * args)
 	while (1) 
 	{
 		memset(buf,'\0',1000*sizeof(char));
+		memset(buf2,'\0',1000*sizeof(char));
 
 		// bzero(&sender, sizeof(sender));
 		//extracts the command from the IN buffer
 		n = recv(sd2, buf, sizeof(buf), 0);
 		if (n > 0)
 		{
+			printf("\nEndOfOneWhileCycle%s\n",buf);
 			memset(cmd,'\0',4*sizeof(char));
 			memset(source,'\0',20*sizeof(char));
 			memset(msg,'\0',140*sizeof(char));
@@ -212,10 +233,13 @@ void * socRead(void * args)
 			int index = -1;
 			int iSource = -1;
 			char name[20];
+			int nameLen = 0;
 			//this is a login
 			if(strncmp(cmd,"/lg",3) == 0)
 			{
-				memcpy(name,buf+3,strlen(buf+3));
+				nameLen = strlen(source)+1;
+				memcpy(name,source,nameLen);
+				
 				//this a login cmd
 				//store address
 				//checks if the user exists
@@ -227,7 +251,7 @@ void * socRead(void * args)
 					if( index != -1)
 					{
 						//index is a free spot - filling it with an information
-						memcpy(users[index].name,source,strlen(source)*sizeof(char));
+						memcpy(users[index].name,source,nameLen*sizeof(char));
 						users[index].status = 1;
 						users[index].socketHandler = sd2;
 					}
@@ -267,13 +291,16 @@ void * socRead(void * args)
 				//this a client requesting new chat
 				
 				printf("Finding %s\n", msg );
-				printAllListInfo(users,MAX_USERS);
-				// index = isUserConnected(users,msg,MAX_USERS);
+				// printAllListInfo(users,MAX_USERS);
+				nameLen = strlen(source)+1;
+				index = isUserConnected(users,msg,MAX_USERS);
 				if(index >= 0)
 				{
 					//accepted
 					printf("Request connection to %s\n",users[index].name );
-					rqNewConnection(users[index].socketHandler);
+					printf("Request connection from %s\n",source);
+					sendMsg(source, users[index].socketHandler,"/rq");
+					// rqNewConnection(users[index].socketHandler, source, nameLen);
 				}
 				else
 				{
@@ -283,13 +310,36 @@ void * socRead(void * args)
 					sendError(users[iSource].socketHandler);
 				}
 			}
+			else if(strncmp(cmd,"/so",3) == 0)		// socket ok, created
+			{
+				//this a client requesting new chat
+
+				memcpy(buf2,source,strlen(source)*sizeof(char));
+				memcpy(buf2+strlen(buf2),"#",sizeof(char));
+
+				memset(msg2,'\0',1000*sizeof(char));
+
+				deserializer2(msg,source,msg2);
+
+				printf("FROM: %s\n", source );
+				
+				printf("MSG 2: %s\n", msg2 );
+				
+				memcpy(buf2+strlen(buf2),msg2,strlen(msg2)*sizeof(char));
+				
+				iSource = getUserByName(users,source,MAX_USERS);
+				printf("buf2: %s\n", buf2 );
+				sendMsg(buf2, users[iSource].socketHandler,"/so");
+				
+			}
 
 
 			
 		// #endregion
 			
 			// printf("\033[22;31mclient: \033[22;37m");
-			printf("EndOfOneWhileCycle%s\n",buf);
+
+
 			fflush(stdout);
 			n=0;
 		}
@@ -347,10 +397,31 @@ void closeAll()
 	fflush(stdout);
 	exit(0);
 }
-void rqNewConnection(int socket)
+void rqNewConnection(int socket, char * source, int nameLen)
 {
 	char buf2[140] = "/rq";
+	memcpy(buf2+3, source, nameLen*sizeof(char));
+	printf("I am going to send : %s\n", buf2);
+
 	send(socket,buf2,strlen(buf2),0);
+	
+
+}
+void sendNewSocket(int socket, int newSocket)
+{
+	char buf2[140];
+	char buf3[10];
+	
+	memset(buf2,'\0',140*sizeof(char));
+	memset(buf3,'\0',10*sizeof(char));
+	
+	// itoa(newSocket,buf3,10);
+	snprintf(buf3, 10,"%d",newSocket);
+	memcpy(buf2,"/so",3*sizeof(char));
+	memcpy(buf2+3,buf3,strlen(buf3)*sizeof(char));
+	printf("sendNewSocket: %s\n", buf2 );
+	send(socket,buf2,strlen(buf2),0);
+
 
 }
 void sendError(int socket)
@@ -365,24 +436,14 @@ void deserializer(const char * buf,char * source,char * cmd,char * msg)
 {
 	int i;
 	char localBuf[1000];
+	memset(localBuf, '\0', 1000);
 	memcpy(localBuf,buf,strlen(buf)*sizeof(char));
 	
 	memcpy(cmd,localBuf,3*sizeof(char));
-	
-	// char * ptr;
-	
-	// ptr = strtok(localBuf+3,"#");
-	
-	// memcpy(source,ptr,strlen(ptr)*sizeof(char));
-	
-	// ptr = strtok(NULL,"#");
-	// memcpy(msg,ptr,strlen(ptr)*sizeof(char));
-	
-	
 
 	for(i=3;i<strlen(localBuf);++i)
 	{
-		printf("%d %s\n", i,localBuf+i);	
+		// printf("%d %s\n", i,localBuf+i);	
 		if(strncmp(localBuf+i,"#",1) == 0)
 		{
 			break;
@@ -393,14 +454,103 @@ void deserializer(const char * buf,char * source,char * cmd,char * msg)
 	{
 		printf("ERROR!\n");
 		
+	}
+	else
+	{
+		memcpy(source,localBuf+3,(i-3)*sizeof(char));
+		memcpy(msg,localBuf+i+1,strlen(localBuf)*sizeof(char));
+
+	}
+
+}
+
+void deserializer2(const char * buf,char * source,char * msg)
+{
+	int i;
+	char localBuf[1000];
+	memset(localBuf, '\0', 1000);
+	memcpy(localBuf,buf,strlen(buf)*sizeof(char));
+
+	for(i=0;i<strlen(localBuf);++i)
+	{
+		
+		if(strncmp(localBuf+i,"#",1) == 0)
+		{
+			break;
+		}
+
+	}
+	if(i == strlen(localBuf))
+	{
+		printf("ERROR!\n");
 		
 	}
 	else
 	{
+		// printf(">>>>>> %s <<<<<<< \n", buf );
+		// printf(">>>>>> %s <<<<<<< \n", localBuf );
+		memcpy(msg,localBuf+i+1,strlen(localBuf+i+1)*sizeof(char));
+		memcpy(source,localBuf,i*sizeof(char));
 
 	}
-		memcpy(source,localBuf+3,(i-3)*sizeof(char));
-		memcpy(msg,localBuf+i+1,strlen(localBuf)*sizeof(char));
+
 
 }
 
+int sendMsg(char * msg, int socket,char * cmd)
+{
+	char myIp[140];
+	char bufOut[200];
+	
+	memset(bufOut,'\0',200*sizeof(char));
+	
+	getMyIp(myIp,socket);
+	
+	printf("myIp: %s\n", myIp);
+	
+	memcpy(bufOut,cmd,3*sizeof(char));
+	printf("bufOut CMD %s\n", bufOut );
+	
+	memcpy(bufOut+strlen(bufOut),myIp,strlen(myIp)*sizeof(char));
+	printf("bufOut IP %s\n", bufOut );
+
+	memcpy(bufOut+strlen(bufOut),"#",1*sizeof(char));
+	printf("bufOut # %s\n", bufOut );
+	
+	memcpy(bufOut+strlen(bufOut),msg,strlen(msg)*sizeof(char));
+	
+	printf("bufOut LENT %d\n", strlen(bufOut) );
+	send(socket,bufOut,strlen(bufOut),0);
+	
+	printf("\tbufOut Total %s\n", bufOut );
+	return 0;
+}
+
+void getMyIp(char * ip, int socket)
+{
+
+	struct ifaddrs *addrs, *tmp;
+	getifaddrs(&addrs);
+	int interfacesNum = 0;
+	tmp = addrs;
+
+	while (tmp) 
+	{
+
+	if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET)
+	{
+	struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
+	if(interfacesNum == 1)
+	{
+		memset(ip,'\0',140*sizeof(char));	//clear memory
+		memcpy(ip,inet_ntoa(pAddr->sin_addr),strlen(inet_ntoa(pAddr->sin_addr)));			//read line	
+
+	}
+	interfacesNum++;
+	}
+	tmp = tmp->ifa_next;
+
+	}
+
+
+}

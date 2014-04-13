@@ -42,7 +42,8 @@ int isUserConnected(userInfo * users, char * userName,  int numElements)
 	int i;
 	for (i = 0; i < numElements; ++i)
 	{
-		if(!strcmp((users+i)->name ,userName) && (users+i)->status == 1)
+		printf("%s | %s :: %d\n",userName,(users+i)->name, strcmp(userName,(users+i)->name));
+		if(!strcmp(userName,(users+i)->name) && (users+i)->status == 1)
 			return i;
 	}
 	

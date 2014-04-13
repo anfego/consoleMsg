@@ -113,6 +113,7 @@ void Send_Msg(int fd,char* buf, int size)
 	int n;
 	n = write(fd, buf, size);
 	Error_Check(n, "Send_Msg write");
+
 }
 
 int Recv_Msg(int fd, char * buf )
