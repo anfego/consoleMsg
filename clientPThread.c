@@ -67,14 +67,15 @@ void consoleEngine();
 void * clientEngine(void * socketIn);
 
 //this retunrs a socket descriptor
-int createSocket(char* host);
+int createSocket(char* host, int port);
 
-int openConnection();
+int openConnection(int socket);
 void closeConnection(int socket);
 int login (int socketHandler);
 void getMyIp(char * ip, int socket);
 int sendMsg(char * msg, int socket, char * cmd);
 void deserializer(const char * buf,char * source,char * cmd,char * msg);
+void deserializer2(const char * buf,char * source,char * msg);
 void * chat(void * args);
 
 int main(int argc, char *argv[])
@@ -83,7 +84,7 @@ int main(int argc, char *argv[])
 	char buf[1000];
 	zeroStatus(users,MAX_USERS);
 
-	if( (users[0].socketHandler = createSocket(argv[1])) < 0 )
+	if( (users[0].socketHandler = createSocket(argv[1], PROTOPORT)) < 0 )
 		return 1;
 
 	users[0].status = 1;
@@ -111,14 +112,15 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-int createSocket(char* host)
+int createSocket(char* host, int portIn)
 {
 	struct hostent *ptrh; /* pointer to a host table entry */
 	struct protoent *ptrp; /* pointer to a protocol table entry */
 	struct sockaddr_in sad; /* structure to hold an IP address */
 	int sd; /* socket descriptor */
-	int port = PROTOPORT; /* protocol port number */
-	
+	// int port = PROTOPORT; /* protocol port number */
+	int port = portIn;
+
 	int n; /* number of characters read */
 	int pid;
 	char buf[1000], buf2[1000]; /* buffer for data from the server */
@@ -126,6 +128,7 @@ int createSocket(char* host)
 	int i;
 	int error = 0;
 	// clear sockaddr structure
+	
 	memset((char *)&sad,0,sizeof(sad)); 
 	
 	sad.sin_family = AF_INET; /* set family to Internet */
@@ -140,33 +143,39 @@ int createSocket(char* host)
 
 	/* Convert host name to equivalent IP address and copy to sad. */
 	ptrh = gethostbyname(host);
-
+	printf("*\n");
 	if ( ((char *)ptrh) == NULL ) 
 	{
 		fprintf(stderr,"invalid host: %s\n", host);
 		return -1;
 	}
+	
 	memcpy(&sad.sin_addr, ptrh->h_addr, ptrh->h_length);
 	/* Map TCP transport protocol name to protocol number. */
+	printf("*\n");
 	if ( ((int)(ptrp = getprotobyname("tcp"))) == 0) 
 	{
 		fprintf(stderr, "cannot map \"tcp\" to protocol number");
 		return -1;
 	}
+	
 	/* Create a socket. */
 	sd = socket(PF_INET, SOCK_STREAM, ptrp->p_proto);
-
+	printf("*\n");
 	if (sd < 0) 
 	{
 		fprintf(stderr, "socket creation failed\n");
 		return -1;
 	}
+	
 	/* Connect the socket to the specified server. */
+	printf("*\n");
 	if (connect(sd, (struct sockaddr *)&sad, sizeof(sad)) < 0) 
 	{
 		fprintf(stderr,"connect failed\n");
 		return -1;
 	}
+	printf("5\n");
 	return sd;
 }
 int login(int socketHandler)
@@ -228,6 +237,7 @@ int sendMsg(char * msg, int socket,char * cmd)
 	getMyIp(myIp,socket);
 	
 	printf("myIp: %s\n", myIp);
+	printf("mySocket: %d\n", socket);
 	
 	memcpy(bufOut,cmd,3*sizeof(char));
 	printf("bufOut CMD %s\n", bufOut );
@@ -287,10 +297,19 @@ void consoleEngine()
 			int index = -1;
 			memcpy(destination,buf2+3,(strlen(buf2)-3)*sizeof(char));
 			sendMsg(destination,users[0].socketHandler,"/nc");
-			// send(users[0].socketHandler, buf2,strlen(buf2),0);
-			// index = findNiceSpot
-			// pthread_create(users.);
-			//TODO: Create a Pthread to handle new connection
+
+		}
+		else if(strncmp(buf2,"/cn",3) == 0)
+		{
+
+			memcpy(destination,buf2+3,1*sizeof(char));
+			// memcpy(msg,buf2+3,(2)*sizeof(char));
+			
+			sendMsg(buf2+3+1,users[atoi(destination)].socketHandler,"/cn");
+		}
+		else if(strncmp(buf2,"/us",3) == 0)
+		{
+			printAllListInfo(users,MAX_USERS);
 		}
 		
 		// 	printf("\033[22;31mserver: \033[22;37m");
@@ -301,10 +320,51 @@ void consoleEngine()
 	}
 
 }
-void * chat (void * args)
+void * chat (void * socketHandler)
 {
+	int socket = *((int *)socketHandler);
+	int n = 0;
+	char buf[140];
+	char cmd[4];
+	char source[20];
+	char msg[140];
+	printf("Inside pthread for socket: %d\n",socket);
+	
+	while(1)
+	{
+		memset(buf, '\0', 140*sizeof(char));
+		memset(cmd, '\0', 4*sizeof(char));
 
+		n = recv(socket, buf, sizeof(buf), 0);
+		if(n > 0)
+		{
+		
+			memset(cmd,'\0',4*sizeof(char));
+			memset(source,'\0',20*sizeof(char));
+			memset(msg,'\0',140*sizeof(char));
+			
+			deserializer(buf,source,cmd,msg);
+			
+			printf("CMD: %s\n", cmd );
+			printf("Source: %s\n", source );
+			printf("MSG: %s\n", msg );
 
+			if(strncmp(cmd,"/me",3) == 0)
+			{
+			//got encrypted message	
+
+			}
+			else if(strncmp(cmd,"/cn",3) == 0)
+			{
+				printf("received: %s\n", msg);
+			}
+			else if(strncmp(cmd,"/ex",3) == 0)
+			{
+				closeConnection(socket);
+				break;
+			}
+		}
+	}
 }
 void * clientEngine(void * socketIn)
 {
@@ -318,13 +378,14 @@ void * clientEngine(void * socketIn)
 	char msg[140];
 	
 	int n, index;
+	struct sockaddr_in sad; /* structure to hold an IP address */
 	printf("LISTENING on %d!!!!!\n",socket);	
 	while(1)
 	{
 		memset(buf, '\0', 140*sizeof(char));
 		memset(cmd, '\0', 4*sizeof(char));
 
-		n = recv(socket, buf, 140*sizeof(char), 0);
+		n = recv(socket, buf, sizeof(buf), 0);
 		
 		if(n > 0)
 		{
@@ -361,13 +422,42 @@ void * clientEngine(void * socketIn)
 					// memcpy(buf2,buf+3,strlen(buf+3));
 
 					users[index].socketHandler = New_Socket(&port);
+					users[index].status = 1;
+					memcpy(users[index].name, msg, strlen(msg)*sizeof(char));
 					
-					printf("\tThis is the new socket: %d for %s\n", users[index].socketHandler,msg);
+					printUserInfo(&users[index]);
+						
+					printf("\tThis is the new port: %d for %s\n", port,msg);
+					
 					memcpy(buf2,msg,strlen(msg)*sizeof(char));
 					memcpy(buf2+strlen(buf2),"#",sizeof(char));
-					sprintf(buf2+strlen(buf2),"%d",users[index].socketHandler);
+					
+					sprintf(buf2+strlen(buf2),"%d",port);
 
+					
 					sendMsg(buf2,users[0].socketHandler,"/so");
+					
+					printf("Before connection\n" );
+					
+					// listenConnection(users[index].socketHandler);
+
+					Accept_Connection(users[index].socketHandler);
+					
+					// openConnection(users[index].socketHandler);
+
+					printf("After socket creation socket= %d\n", users[index].socketHandler );
+					
+					if ((error = pthread_create(
+										&(users[index].userPThread),
+										NULL, 
+										chat,
+										(void *)&(users[index].socketHandler )))
+								!= 0) 
+					{
+					 	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
+						exit(EXIT_FAILURE);
+					}
+					
 					// notify the server about the new socket to handle the new connection
 
 					// if ((error = pthread_create(&(users[index].userPThread),NULL, chat, NULL)) != 0) 
@@ -395,8 +485,55 @@ void * clientEngine(void * socketIn)
 
 			else if(strncmp(cmd,"/so",3) == 0)
 			{
+
+				int port;
 				printf("Ok stablish connection to %s\n",msg);
+				// extract information from msg
+				deserializer2(msg,source,msg);
+				index = findNiceSpot(users,MAX_USERS);
+
+				printf("Connecting to : %s\n", source );
+				port = atoi(msg);
+				printf("BY port : %d\n", port );
+
+				memcpy(users[index].name, source, strlen(source)*sizeof(char));
+				sleep(2);
+				printf("Before socket Create\n" );
+
+
+				// users[index].socketHandler = New_Socket(&port);
+				users[index].socketHandler = createSocket(source, port);
+				// if (connect(users[index].socketHandler, (struct sockaddr *)&sad, sizeof(sad)) < 0) 
+				// {
+				// 	fprintf(stderr,"connect failed\n");
+
+				// }
+				
+				// users[index].socketHandler = createSocket(users[index].name);
+
+				printf("socketHandler : %d\n", users[index].socketHandler);
+
+
+				printUserInfo(&users[index]);
+
+				
+				if ((error = pthread_create(
+										&(users[index].userPThread),
+										NULL,
+										chat,
+										(void*)&(users[index].socketHandler))) != 0) 
+				{
+				 	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
+					exit(EXIT_FAILURE);
+				}
+
+
 			}
+			else if(strncmp(cmd,"/cn",3) == 0)
+			{
+				printf("received: %s\n");
+			}
+
 	
 		}
 	}
@@ -435,6 +572,8 @@ void deserializer(const char * buf,char * source,char * cmd,char * msg)
 {
 	int i;
 	char localBuf[1000];
+	memset(localBuf, '\0', 1000*sizeof(char));
+
 	memcpy(localBuf,buf,strlen(buf)*sizeof(char));
 	
 	memcpy(cmd,localBuf,3*sizeof(char));
@@ -459,5 +598,94 @@ void deserializer(const char * buf,char * source,char * cmd,char * msg)
 		memcpy(msg,localBuf+i+1,strlen(localBuf)*sizeof(char));
 
 	}
+
+}
+
+void deserializer2(const char * buf,char * source,char * msg)
+{
+	int i;
+	char localBuf[1000];
+	memset(localBuf, '\0', 1000*sizeof(char));
+	memcpy(localBuf,buf,strlen(buf)*sizeof(char));
+
+	for(i=0;i<strlen(localBuf);++i)
+	{
+		
+		if(strncmp(localBuf+i,"#",1) == 0)
+		{
+			break;
+		}
+
+	}
+	if(i == strlen(localBuf))
+	{
+		printf("ERROR!\n");
+		
+	}
+	else
+	{
+
+		memcpy(msg,localBuf+i+1,strlen(localBuf+i+1)*sizeof(char));
+		memset(msg+strlen(localBuf+i+1), '\0', (1000-strlen(localBuf+i+1))*sizeof(char) );
+		memcpy(source,localBuf,i*sizeof(char));
+
+	}
+
+
+}
+int listenConnection(int socketHandler)
+{
+	int resp=0;
+	resp = listen(socketHandler, 6);
+	if (resp < 0) 
+	{
+		fprintf(stderr,"listen failed\n");
+		exit(1);
+	}
+	if(resp == EADDRINUSE)
+	{
+		printf("Already in use\n");
+	}
+
+	return 0;
+}
+int openConnection(int socket)
+{
+	int alen;
+	struct sockaddr_in cad; /* structure to hold client's address */
+	/* Bind a local address to the socket */
+	
+/* Specify size of request queue */
+	if (listen(socket, 6) < 0) 
+	{
+		fprintf(stderr,"listen failed\n");
+		exit(1);
+	}
+/* Main server loop - accept and handle requests */
+	
+	printf("I'm waiting for connections ...\n");
+	
+	while(1)
+	{
+		alen = sizeof(cad);
+		fflush(stdout);
+		if ( (socket=accept(socket, (struct sockaddr *)&cad, &alen)) < 0) 
+		{
+			fprintf(stderr, "accept failed\n");
+			exit(1);
+		}
+		else 
+		{
+			// if ((thr_err = pthread_create(&usersThrd[numCon],NULL, socRead   , &sbuf_t)) != 0) 
+			// {
+   //     		 	fprintf(stderr, "Err. pthread_create() %s\n", strerror(thr_err));
+   //      		exit(EXIT_FAILURE);
+   //  		}
+			printf("I received one connection. Now I have %d conections\n", 1);
+			break;
+		}
+
+	}
+	return socket;
 
 }

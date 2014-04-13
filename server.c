@@ -436,7 +436,7 @@ void deserializer(const char * buf,char * source,char * cmd,char * msg)
 {
 	int i;
 	char localBuf[1000];
-	memset(localBuf, '\0', 1000);
+	memset(localBuf, '\0', 1000*sizeof(char));
 	memcpy(localBuf,buf,strlen(buf)*sizeof(char));
 	
 	memcpy(cmd,localBuf,3*sizeof(char));
@@ -468,7 +468,7 @@ void deserializer2(const char * buf,char * source,char * msg)
 {
 	int i;
 	char localBuf[1000];
-	memset(localBuf, '\0', 1000);
+	memset(localBuf, '\0', 1000*sizeof(char));
 	memcpy(localBuf,buf,strlen(buf)*sizeof(char));
 
 	for(i=0;i<strlen(localBuf);++i)
@@ -487,8 +487,7 @@ void deserializer2(const char * buf,char * source,char * msg)
 	}
 	else
 	{
-		// printf(">>>>>> %s <<<<<<< \n", buf );
-		// printf(">>>>>> %s <<<<<<< \n", localBuf );
+
 		memcpy(msg,localBuf+i+1,strlen(localBuf+i+1)*sizeof(char));
 		memcpy(source,localBuf,i*sizeof(char));
 
@@ -507,6 +506,7 @@ int sendMsg(char * msg, int socket,char * cmd)
 	getMyIp(myIp,socket);
 	
 	printf("myIp: %s\n", myIp);
+	printf("mySocket: %d\n", socket);
 	
 	memcpy(bufOut,cmd,3*sizeof(char));
 	printf("bufOut CMD %s\n", bufOut );
