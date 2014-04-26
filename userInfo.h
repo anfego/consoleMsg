@@ -4,15 +4,18 @@
 #include <string.h>
 #include <pthread.h>	// use thread functions
 
-#define MAX_USERS 40
+#define MAX_USERS 	40
+#define SERVER 		0
+#define CLIENT 		1
 
 typedef struct userInfo
 {
 	char name[20];
 	//char ip[20];
-	//int port;
+	int port;
 	int socketHandler;
 	int status;	//0 is not conected 1: is connected
+	int myRole; //0 if my role is server, 1 if my role is Client
 	pthread_t userPThread;
 
 
@@ -33,5 +36,8 @@ int findNiceSpot(userInfo * users,int numElements);
 
 void printAllListInfo(userInfo * users,int numElements);
 void printUserInfo(userInfo * user);
+int amIClient(userInfo * chatInfo);
+void setRole(userInfo * users, int chatIndex, int role);
+void setPort(userInfo * users, int chatIndex, int port);
 
 #endif

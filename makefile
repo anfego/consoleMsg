@@ -8,7 +8,7 @@ CFLAGS = -c
 AFLAGS = rf
 
 
-all: server.c client.c
+all: server.c clientPThread.c
 	$(CC) communications.c -c
 	$(CC) userInfo.c -c -lpthread
 	$(CC) server.c  userInfo.o -o server.e -lpthread
