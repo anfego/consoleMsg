@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+
 #include <ifaddrs.h>	
 				
 #include <netinet/in.h>
@@ -253,7 +254,7 @@ int sendMsg(char * msg, int socket,char * cmd)
 	printf("bufOut LENT %d\n", strlen(bufOut) );
 	send(socket,bufOut,strlen(bufOut),0);
 	
-	printf("\tbufOut Total %s\n", bufOut );
+	printf("\t%d:bufOut Total %s\n",socket, bufOut );
 	return 0;
 }
 void consoleEngine()
@@ -302,12 +303,17 @@ void consoleEngine()
 		else if(strncmp(buf2,"/cn",3) == 0)
 		{
 			int index = -1;
-			memcpy(destination,buf2+3,1*sizeof(char));
+			char cmd[4];
+			char msg[140];
+			memset(msg, '\0', 140*sizeof(char));
+			memset(cmd, '\0', 4*sizeof(char));
+			sscanf(buf2,"%s %d %s",cmd,&index,msg);
+			// memcpy(destination,buf2+3,1*sizeof(char));
 			// memcpy(msg,buf2+3,(2)*sizeof(char));
-			index = atoi(destination);
-			printf("Sending to index:%d\n",index );
+			// index = atoi(destination);
+			printf("Sending %s to index:%d and cmd %s\n", msg, index,cmd);
 			
-			sendMsg(buf2+3+1,users[index].socketHandler,"/cn");
+			sendMsg(msg,users[index].socketHandler,cmd);
 		}
 		else if(strncmp(buf2,"/us",3) == 0)
 		{
@@ -347,7 +353,9 @@ void * chat (void * chatInfo)
 	{
 
 		printf("Inside pthread for socket: %d as server\n", chat->socketHandler);
-		Accept_Connection(chat->socketHandler);
+		int newSocket = Accept_Connection(chat->socketHandler);
+		closesocket(chat->socketHandler);
+		chat->socketHandler = newSocket;
 		printf("connection Acepted\n");
 	}
 	
@@ -355,7 +363,15 @@ void * chat (void * chatInfo)
 	{
 		
 		memset(buf, '\0', 140*sizeof(char));
-		n = recv(chat->socketHandler, buf, sizeof(buf), 0);
+		n = recv(chat->socketHandler, buf, 140*sizeof(char), 0);
+		if (n < 0)
+		{
+			// printf("Error in socket - %d\n",sock_errno());\
+			Error_Check(-1,"Reading socket");
+			
+  			exit(0);
+		}
+		// printf("\t\t\t\tBytes%d\n",n );
 		if(n > 0)
 		{
 		
@@ -392,10 +408,10 @@ void * clientEngine(void * socketIn)
 	int socket = *((int *)socketIn);
 	
 
-	fd_set active_fd_set, read_fd_set, write_fd_set;
-	FD_ZERO (&active_fd_set);
-	FD_SET (socket, &active_fd_set);
-	read_fd_set = active_fd_set;
+	// fd_set active_fd_set, read_fd_set, write_fd_set;
+	// FD_ZERO (&active_fd_set);
+	// FD_SET (socket, &active_fd_set);
+	// read_fd_set = active_fd_set;
 
 	struct sockaddr_in clientname;
 	struct timeval tv;
@@ -418,21 +434,21 @@ void * clientEngine(void * socketIn)
 	printf("LISTENING on %d!!!!!\n",socket);	
 	while(1)
 	{
-		retVal = select (FD_SETSIZE, &read_fd_set, NULL, NULL, &tv);
-		if (retVal == -1)
-		{
-			perror ("select");
-			exit (EXIT_FAILURE);
-		}
-		for (i = 0; i < FD_SETSIZE; ++i)
-		{
+		// retVal = select (FD_SETSIZE, &read_fd_set, NULL, NULL, &tv);
+		// if (retVal == -1)
+		// {
+		// 	perror ("select");
+		// 	exit (EXIT_FAILURE);
+		// }
+		// for (i = 0; i < FD_SETSIZE; ++i)
+		// {
 
-			if (FD_ISSET (i, &read_fd_set))
-			{
-				printf("\t\tSelect %d socket\n",retVal,i );
+		// 	if (FD_ISSET (i, &read_fd_set))
+		// 	{
+		// 		printf("\t\tSelect %d socket\n",retVal,i );
 
-			}
-		}
+		// 	}
+		// }
 		memset(buf, '\0', 140*sizeof(char));
 		memset(cmd, '\0', 4*sizeof(char));
 
