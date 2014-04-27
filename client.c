@@ -146,7 +146,7 @@ int createSocket(char* host, int portIn)
 
 	/* Convert host name to equivalent IP address and copy to sad. */
 	ptrh = gethostbyname(host);
-	printf("Host %s of LENT %d port %d\n",host, strlen(host), portIn);
+	
 	if ( ((char *)ptrh) == NULL ) 
 	{
 		fprintf(stderr,"invalid host: %s\n", host);
@@ -208,24 +208,24 @@ int sendMsg(char * msg, int socket,char * cmd)
 	
 	getMyIp(myIp,socket);
 	
-	printf("myIp: %s\n", myIp);
-	printf("mySocket: %d\n", socket);
+	
+	
 	
 	memcpy(bufOut,cmd,3*sizeof(char));
-	printf("bufOut CMD %s\n", bufOut );
+	
 	
 	memcpy(bufOut+strlen(bufOut),myIp,strlen(myIp)*sizeof(char));
-	printf("bufOut IP %s\n", bufOut );
+	
 
 	memcpy(bufOut+strlen(bufOut),"#",1*sizeof(char));
-	printf("bufOut # %s\n", bufOut );
+	
 	
 	memcpy(bufOut+strlen(bufOut),msg,strlen(msg)*sizeof(char));
 	
-	printf("bufOut LENT %d\n", strlen(bufOut) );
+	
 	send(socket,bufOut,strlen(bufOut),0);
 	
-	printf("\t%d:bufOut Total %s\n",socket, bufOut );
+	// printf("\t%d:bufOut Total %s\n",socket, bufOut );
 	return 0;
 }
 void consoleEngine()
@@ -240,7 +240,7 @@ void consoleEngine()
 	char cmd[4];
 	char msg[140];
 	// memcpy(buf2,"/nc192.168.4.132",sizeof(char)*16);
-	printf("CONSOLE!!!!\n");
+	
 	while(1)	
 	{
 		fgets(buf2,1000,stdin);						//read line
@@ -274,7 +274,6 @@ void consoleEngine()
 		{
 			int index = -1;
 			sscanf(buf2,"%s %d %99[a-zA-Z0-9 ]s",cmd,&index,msg);
-			printf("Sending %s to index:%d and cmd %s\n", msg, index,cmd);
 			sendMsg(msg,users[index].socketHandler,cmd);
 		}
 		else if(strncmp(buf2,"/us",3) == 0)
@@ -297,20 +296,16 @@ void * chat (void * chatInfo)
 	char source[20];
 	char msg[140];
 	setStatus(users,chat);
-	printAllListInfo(users,MAX_USERS);
 	if (amIClient((users+chat)) == CLIENT)
 	{
 		(users+chat)->socketHandler = createSocket((users+chat)->name, (users+chat)->port);
-		printf("Inside pthread for socket: %d as client on port %d\n", (users+chat)->socketHandler,(users+chat)->port);
+		
 	}
 	else
 	{
-
-		printf("Inside pthread for socket: %d as server\n", (users+chat)->socketHandler);
 		int newSocket = Accept_Connection((users+chat)->socketHandler);
 		closesocket((users+chat)->socketHandler);
 		(users+chat)->socketHandler = newSocket;
-		printf("connection Acepted\n");
 	}
 	while(1)
 	{
@@ -381,7 +376,7 @@ void * clientEngine(void * socketIn)
 	
 	int n, index;
 	struct sockaddr_in sad; /* structure to hold an IP address */
-	printf("LISTENING on %d!!!!!\n",socket);	
+	
 	while(1)
 	{
 
@@ -396,7 +391,7 @@ void * clientEngine(void * socketIn)
 			memset(cmd,'\0',4*sizeof(char));
 			memset(source,'\0',20*sizeof(char));
 			memset(msg,'\0',140*sizeof(char));
-			printf("********************buffer In: %s\n", buf);
+			
 			deserializer(buf,source,cmd,msg);
 			
 			printf("CMD: %s\n", cmd );
@@ -420,31 +415,26 @@ void * clientEngine(void * socketIn)
 				{
 					//connection can be stablished
 					// create control pthread that will signal to all other threds to exit
-					printAllListInfo(users,MAX_USERS);
+					
 					int port = 0;
 					index = findNiceSpot(users,MAX_USERS);
 					users[index].socketHandler = New_Socket(&port);
-					// users[index].status = 1;
+					
 					setStatus(users,index);
 					memcpy(users[index].name, msg, strlen(msg)*sizeof(char));
 					
-					// printUserInfo(&users[index]);
+					
 						
-					printf("\t%d:This is the new port: %d for %s\n",index, port,msg);
 					
 					memcpy(buf2,msg,strlen(msg)*sizeof(char));
 					memcpy(buf2+strlen(buf2),"#",sizeof(char));
 					
 					sprintf(buf2+strlen(buf2),"%d",port);
 
-					
 					sendMsg(buf2,users[0].socketHandler,"/so");
 					
-					printf("Before connection\n" );
-
-					setRole(users,index,SERVER);
 					
-					printf("After socket creation socket= %d\n", users[index].socketHandler );
+					setRole(users,index,SERVER);
 					
 					if ((error = pthread_create(
 										&(users[index].userPThread),
@@ -455,7 +445,7 @@ void * clientEngine(void * socketIn)
 					 	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
 						exit(EXIT_FAILURE);
 					}
-					printf("request attended\n");
+					// printf("request attended\n");
 
 
 				}
@@ -470,24 +460,22 @@ void * clientEngine(void * socketIn)
 			{
 
 				int port;
-				printAllListInfo(users,MAX_USERS);
-				printf("Ok stablish connection to %s\n",msg);
+				
 				// extract information from msg
 				deserializer2(msg,source,msg);
 				index = findNiceSpot(users,MAX_USERS);
 
-				printf("Connecting to : %s -> %d\n", source, strlen(source) );
 				port = atoi(msg);
-				printf("BY port : %d\n", port );
+				
 
 				memcpy(users[index].name, source, strlen(source)*sizeof(char));
 
-				printf("Before socket Create\n" );
+				
 
 				setPort(users,index,port);
 				setRole(users,index,CLIENT);
 
-				printf("socketHandler : %d\n", users[index].socketHandler);
+				
 
 				// printUserInfo(&users[index]);
 
