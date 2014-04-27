@@ -39,5 +39,7 @@ void printUserInfo(userInfo * user);
 int amIClient(userInfo * chatInfo);
 void setRole(userInfo * users, int chatIndex, int role);
 void setPort(userInfo * users, int chatIndex, int port);
+void setStatus(userInfo * users, int chatIndex);
+void clearStatus(userInfo * users, int chatIndex);
 
 #endif

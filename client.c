@@ -89,6 +89,8 @@ int main(int argc, char *argv[])
 		return 1;
 
 	users[0].status = 1;
+	sscanf(argv[1],"%s",users[0].name);
+	
 
 	login(users[0].socketHandler);
 	printf("Login\n");
@@ -185,33 +187,6 @@ int login(int socketHandler)
 	char buf2[500];
 	sendMsg("%",socketHandler,"/lg");
 	
-	// struct ifaddrs *addrs, *tmp;
-	// getifaddrs(&addrs);
-	// int interfacesNum = 0;
-	// tmp = addrs;
-
-	// while (tmp) 
-	// {
-
-	//     if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET)
-	//     {
-	//         struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
-	//         if(interfacesNum == 1)
-	//         {
-	//         	memset(buf2,'\0',sizeof(buf2));	//clear memory
- 	//        		memcpy(buf2,"/lg",sizeof(char)*3);
- 	//        		memcpy(buf2+3,inet_ntoa(pAddr->sin_addr),strlen(inet_ntoa(pAddr->sin_addr)));			//read line	
- 	       		
- 	//        	}
-	//         interfacesNum++;
-	//     }
-	// 	tmp = tmp->ifa_next;
-
-	// }
-
-	// freeifaddrs(addrs);
-	// send(socketHandler,buf2,strlen(buf2),0);
-
 	return 0;
 }
 
@@ -220,10 +195,6 @@ void closeConnection(int socket)
 	char buf2[10];
 	printf("Client Exiting\n");
 	sendMsg("%",socket,"/ex");
-
-	// memset(buf2,'\0',sizeof(buf2));	//clear memory
-	// memcpy(buf2,"/ex",sizeof(char)*3);
-	// send(socket,buf2,strlen(buf2),0);
 	if (socket > 0)
 		closesocket(socket);
 }
@@ -266,115 +237,95 @@ void consoleEngine()
 
 	char buf2[1000];
 	memset(buf2,'\0',sizeof(buf2));	//clear memory
+	char cmd[4];
+	char msg[140];
 	// memcpy(buf2,"/nc192.168.4.132",sizeof(char)*16);
+	printf("CONSOLE!!!!\n");
 	while(1)	
 	{
-		memset(buf2,'\0',1000*sizeof(char));	//clear memory
+		fgets(buf2,1000,stdin);						//read line
 		memset(destination,'\0',140*sizeof(char));	//clear memory
-		fgets(buf2,30,stdin);			//read line
-		int i = strlen(buf2)-1;				//delete CRLF
+		memset(msg, '\0', 140*sizeof(char));
+		memset(cmd, '\0', 4*sizeof(char));
+		int i = strlen(buf2)-1;						//delete CRLF
+		sscanf(buf2,"%s",cmd);
 		if(buf2[i]=='\n') 
 			buf2[i] = '\0';
 	
-		if(!strcmp(buf2,"/ex"))
+		if(!strcmp(cmd,"/ex"))
 		{							//check for exit token
 			for (i = MAX_USERS-1; i >= 0; --i)
 			{							//send to all clients
-				// send(connectionArray[i],buf2,strlen(buf2),0);
 				if(users[i].status == 1)
 				{
 					pthread_cancel(users[i].userPThread);
 					closeConnection(users[i].socketHandler);
 				}
-
-				
 			}
-
-			fflush(stdout);
 			exit(0);
 		}
-		else if (strncmp(buf2,"/nc",3) == 0)
+		else if (strncmp(cmd,"/nc",3) == 0)
 		{
-			int index = -1;
-			memcpy(destination,buf2+3,(strlen(buf2)-3)*sizeof(char));
-			sendMsg(destination,users[0].socketHandler,"/nc");
+			sscanf(buf2,"%s %s",cmd,destination);
+			sendMsg(destination,users[0].socketHandler,cmd);
 
 		}
-		else if(strncmp(buf2,"/cn",3) == 0)
+		else if(strncmp(cmd,"/cn",3) == 0)
 		{
 			int index = -1;
-			char cmd[4];
-			char msg[140];
-			memset(msg, '\0', 140*sizeof(char));
-			memset(cmd, '\0', 4*sizeof(char));
-			sscanf(buf2,"%s %d %s",cmd,&index,msg);
-			// memcpy(destination,buf2+3,1*sizeof(char));
-			// memcpy(msg,buf2+3,(2)*sizeof(char));
-			// index = atoi(destination);
+			sscanf(buf2,"%s %d %99[a-zA-Z0-9 ]s",cmd,&index,msg);
 			printf("Sending %s to index:%d and cmd %s\n", msg, index,cmd);
-			
 			sendMsg(msg,users[index].socketHandler,cmd);
 		}
 		else if(strncmp(buf2,"/us",3) == 0)
 		{
 			printAllListInfo(users,MAX_USERS);
 		}
+		memset(buf2,'\0',1000*sizeof(char));		//clear memory
+		fflush(stdin);
 		
-		// 	printf("\033[22;31mserver: \033[22;37m");
-			printf("%s\n",buf);
-			fflush(stdout);
-			memset(buf,0,sizeof(buf));
-		
+	
 	}
 
 }
 void * chat (void * chatInfo)
 {
-	userInfo * chat = (userInfo *)chatInfo;
+	int chat = *(int *)chatInfo;
 	int n = 0;
 	char buf[140];
 	char cmd[4];
 	char source[20];
 	char msg[140];
-	if (amIClient(chat) == CLIENT)
+	setStatus(users,chat);
+	printAllListInfo(users,MAX_USERS);
+	if (amIClient((users+chat)) == CLIENT)
 	{
-		chat->socketHandler = createSocket(chat->name, chat->port);
-		printf("Inside pthread for socket: %d as client on port %d\n", chat->socketHandler,chat->port);
-	// if (connect(users[index].socketHandler, (struct sockaddr *)&sad, sizeof(sad)) < 0) 
-			// {
-			// 	fprintf(stderr,"connect failed\n");
-
-			// }
-			
-
-
+		(users+chat)->socketHandler = createSocket((users+chat)->name, (users+chat)->port);
+		printf("Inside pthread for socket: %d as client on port %d\n", (users+chat)->socketHandler,(users+chat)->port);
 	}
 	else
 	{
 
-		printf("Inside pthread for socket: %d as server\n", chat->socketHandler);
-		int newSocket = Accept_Connection(chat->socketHandler);
-		closesocket(chat->socketHandler);
-		chat->socketHandler = newSocket;
+		printf("Inside pthread for socket: %d as server\n", (users+chat)->socketHandler);
+		int newSocket = Accept_Connection((users+chat)->socketHandler);
+		closesocket((users+chat)->socketHandler);
+		(users+chat)->socketHandler = newSocket;
 		printf("connection Acepted\n");
 	}
-	
 	while(1)
 	{
 		
 		memset(buf, '\0', 140*sizeof(char));
-		n = recv(chat->socketHandler, buf, 140*sizeof(char), 0);
+		n = recv((users+chat)->socketHandler, buf, 140*sizeof(char), 0);
 		if (n < 0)
 		{
-			// printf("Error in socket - %d\n",sock_errno());\
+	
 			Error_Check(-1,"Reading socket");
-			
-  			exit(0);
+			exit(0);
 		}
-		// printf("\t\t\t\tBytes%d\n",n );
 		if(n > 0)
 		{
-		
+			fflush(stdout);
 			memset(cmd,'\0',4*sizeof(char));
 			memset(source,'\0',20*sizeof(char));
 			memset(msg,'\0',140*sizeof(char));
@@ -396,8 +347,7 @@ void * chat (void * chatInfo)
 			}
 			else if(strncmp(cmd,"/ex",3) == 0)
 			{
-				// /closeConnection(chat->socketHandler);
-				closesocket(chat->socketHandler);
+				closesocket((users+chat)->socketHandler);
 				break;
 			}
 		}
@@ -434,21 +384,7 @@ void * clientEngine(void * socketIn)
 	printf("LISTENING on %d!!!!!\n",socket);	
 	while(1)
 	{
-		// retVal = select (FD_SETSIZE, &read_fd_set, NULL, NULL, &tv);
-		// if (retVal == -1)
-		// {
-		// 	perror ("select");
-		// 	exit (EXIT_FAILURE);
-		// }
-		// for (i = 0; i < FD_SETSIZE; ++i)
-		// {
 
-		// 	if (FD_ISSET (i, &read_fd_set))
-		// 	{
-		// 		printf("\t\tSelect %d socket\n",retVal,i );
-
-		// 	}
-		// }
 		memset(buf, '\0', 140*sizeof(char));
 		memset(cmd, '\0', 4*sizeof(char));
 
@@ -460,7 +396,7 @@ void * clientEngine(void * socketIn)
 			memset(cmd,'\0',4*sizeof(char));
 			memset(source,'\0',20*sizeof(char));
 			memset(msg,'\0',140*sizeof(char));
-			
+			printf("********************buffer In: %s\n", buf);
 			deserializer(buf,source,cmd,msg);
 			
 			printf("CMD: %s\n", cmd );
@@ -484,17 +420,17 @@ void * clientEngine(void * socketIn)
 				{
 					//connection can be stablished
 					// create control pthread that will signal to all other threds to exit
+					printAllListInfo(users,MAX_USERS);
 					int port = 0;
 					index = findNiceSpot(users,MAX_USERS);
-					// memcpy(buf2,buf+3,strlen(buf+3));
-
 					users[index].socketHandler = New_Socket(&port);
-					users[index].status = 1;
+					// users[index].status = 1;
+					setStatus(users,index);
 					memcpy(users[index].name, msg, strlen(msg)*sizeof(char));
 					
-					printUserInfo(&users[index]);
+					// printUserInfo(&users[index]);
 						
-					printf("\tThis is the new port: %d for %s\n", port,msg);
+					printf("\t%d:This is the new port: %d for %s\n",index, port,msg);
 					
 					memcpy(buf2,msg,strlen(msg)*sizeof(char));
 					memcpy(buf2+strlen(buf2),"#",sizeof(char));
@@ -508,41 +444,19 @@ void * clientEngine(void * socketIn)
 
 					setRole(users,index,SERVER);
 					
-					// listenConnection(users[index].socketHandler);
-
-					// Accept_Connection(users[index].socketHandler);
-					
-					// openConnection(users[index].socketHandler);
-
 					printf("After socket creation socket= %d\n", users[index].socketHandler );
 					
 					if ((error = pthread_create(
 										&(users[index].userPThread),
-										NULL, 
+										NULL,
 										chat,
-										(void *)&(users[index])))
-								!= 0) 
+										(void*)&(index))) != 0) 
 					{
 					 	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
 						exit(EXIT_FAILURE);
 					}
-					
-					// notify the server about the new socket to handle the new connection
+					printf("request attended\n");
 
-					// if ((error = pthread_create(&(users[index].userPThread),NULL, chat, NULL)) != 0) 
-					// {
-					//  	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
-					// 	exit(EXIT_FAILURE);
-					// }
-					// // create pthread for particular connection
-					// while(1)
-					// {
-					// 	if(newConnection)
-					// 	{
-					// 		pthreadArray[CurrConnIDX++] = pthread_create......
-					// 	}
-					// closesocket(users[index].socketHandler);
-					break;
 
 				}
 
@@ -556,6 +470,7 @@ void * clientEngine(void * socketIn)
 			{
 
 				int port;
+				printAllListInfo(users,MAX_USERS);
 				printf("Ok stablish connection to %s\n",msg);
 				// extract information from msg
 				deserializer2(msg,source,msg);
@@ -566,34 +481,22 @@ void * clientEngine(void * socketIn)
 				printf("BY port : %d\n", port );
 
 				memcpy(users[index].name, source, strlen(source)*sizeof(char));
-				sleep(2);
+
 				printf("Before socket Create\n" );
 
 				setPort(users,index,port);
 				setRole(users,index,CLIENT);
 
-				// users[index].socketHandler = New_Socket(&port);
-				// users[index].socketHandler = createSocket(source, port);
-
-				// if (connect(users[index].socketHandler, (struct sockaddr *)&sad, sizeof(sad)) < 0) 
-				// {
-				// 	fprintf(stderr,"connect failed\n");
-
-				// }
-				
-				// users[index].socketHandler = createSocket(users[index].name);
-
 				printf("socketHandler : %d\n", users[index].socketHandler);
 
-
-				printUserInfo(&users[index]);
+				// printUserInfo(&users[index]);
 
 				
 				if ((error = pthread_create(
 										&(users[index].userPThread),
 										NULL,
 										chat,
-										(void*)&(users[index]))) != 0) 
+										(void*)&(index))) != 0) 
 				{
 				 	fprintf(stderr, "Err. pthread_create() %s\n", strerror(error));
 					exit(EXIT_FAILURE);

@@ -100,3 +100,11 @@ void setPort(userInfo * users, int chatIndex, int port)
 {
 	((users+chatIndex)->port) = port;
 }
+void setStatus(userInfo * users, int chatIndex)
+{
+	((users+chatIndex)->status) = 1;	
+}
+void clearStatus(userInfo * users, int chatIndex)
+{
+	((users+chatIndex)->status) = 0;
+}

@@ -13,12 +13,12 @@ server: server.c communications.o userInfo.o
 	$(CC) server.c userInfo.o -o server -lpthread
 	
 
-client: clientPThread.o communications.o userInfo.o
-	$(CC) clientPThread.c  userInfo.o communications.o -o client  -lrt  -lpthread 
+client: client.o communications.o userInfo.o
+	$(CC) client.c  userInfo.o communications.o -o client  -lrt  -lpthread 
 
 
 %.o: %.c
 	$(CC) -c $<
 	# gcc client.c -o client
 clean:
-	rm -f *.e *.o 
+	rm -f *.e *.o client server
