@@ -17,7 +17,8 @@ typedef struct userInfo
 	int status;	//0 is not conected 1: is connected
 	int myRole; //0 if my role is server, 1 if my role is Client
 	pthread_t userPThread;
-
+	unsigned char d[300];
+	unsigned char n[300];
 
 
 } userInfo;

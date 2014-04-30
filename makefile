@@ -9,12 +9,12 @@ AFLAGS = rf
 
 all: server client
  
-server: server.c communications.o userInfo.o
-	$(CC) server.c userInfo.o -o server -lpthread
+server: server.c communications.o userInfo.o bigd.o bigdigits.o bigdigitsRand.o bigdRand.o
+	$(CC) server.c userInfo.o bigd.o bigdigits.o bigdigitsRand.o bigdRand.o -o server -lpthread
 	
 
-client: client.o communications.o userInfo.o
-	$(CC) client.c  userInfo.o communications.o -o client  -lrt  -lpthread 
+client: client.o communications.o userInfo.o bigd.o bigdigits.o bigdigitsRand.o bigdRand.o
+	$(CC) client.c bigd.o bigdigits.o bigdigitsRand.o bigdRand.o userInfo.o communications.o -o client  -lrt  -lpthread 
 
 
 %.o: %.c

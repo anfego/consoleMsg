@@ -39,13 +39,18 @@
 #endif
 #include <stdio.h>
 #include <string.h>
+#include <time.h>		
+#include <assert.h>
 //Project Libraries
 #include "userInfo.h"
 #include "communications.h"
-
+#include "bigd.h"
+#include "bigdRand.h"
 
 
 #define PROTOPORT 9047 /* default protocol port number */
+#define KEYSIZE 1024					
+#define BUF_SIZE 300					
 //extern int errno;
 char localhost[] = "raspberrypi"; /* default host name */
 // pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -54,6 +59,10 @@ pthread_t  sendAllThrd;// usersThrd[MAX_THREAD],
 int newConnection = 0;//new connection flag: 1 - if a new connection is to be established;
 int CurrConnIDX = 0; // counts latest element in pthread array
 int error = 0;//use for phtread error during creation
+/*******************************************************/
+// Encryption vars
+BIGD n, e, d;
+/*******************************************************/
 
 
 pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -79,6 +88,11 @@ void deserializer(const char * buf,char * source,char * cmd,char * msg);
 void deserializer2(const char * buf,char * source,char * msg);
 void * chat(void * args);
 
+int generateRSAKey(BIGD n, BIGD e, BIGD d);
+void Decryptor(unsigned char *inMsg, unsigned char *outMsg, BIGD d, BIGD n);
+void encrypt(unsigned char *inMsg, BIGD n, BIGD e, unsigned char *outMsg);
+void setDN(userInfo * user, unsigned char *msg, int i);
+
 int main(int argc, char *argv[])
 {
 	//Zero all connection Status
@@ -90,6 +104,11 @@ int main(int argc, char *argv[])
 
 	users[0].status = 1;
 	sscanf(argv[1],"%s",users[0].name);
+	n = bdNew();
+	e = bdNew();
+	d = bdNew();
+	generateRSAKey(n, e, d);
+	
 	
 
 	login(users[0].socketHandler);
@@ -108,7 +127,9 @@ int main(int argc, char *argv[])
 
 	
 	
-	
+	bdFree(&n);
+	bdFree(&e);
+	bdFree(&d);
 	printf("\tBye\n");
 
 
@@ -184,8 +205,14 @@ int createSocket(char* host, int portIn)
 int login(int socketHandler)
 {
 
-	char buf2[500];
-	sendMsg("%",socketHandler,"/lg");
+	char buf2[2*BUF_SIZE];
+	int size = 0;
+	memset(buf2, '\0', 2*BUF_SIZE);
+	bdConvToHex(d, buf2, BUF_SIZE);
+	size = strlen(buf2);
+	buf2[size] = '@';
+	bdConvToHex(n, buf2+size+1, BUF_SIZE);
+	sendMsg(buf2,socketHandler,"/lg");
 	
 	return 0;
 }
@@ -202,7 +229,7 @@ void closeConnection(int socket)
 int sendMsg(char * msg, int socket,char * cmd)
 {
 	char myIp[140];
-	char bufOut[200];
+	char bufOut[1000];
 	
 	memset(bufOut,'\0',200*sizeof(char));
 	
@@ -235,17 +262,17 @@ void consoleEngine()
 	memset(buf, '\0', 140*sizeof(char));
 	int n, index;
 
-	char buf2[1000];
+	char buf2[1500];
 	memset(buf2,'\0',sizeof(buf2));	//clear memory
 	char cmd[4];
-	char msg[140];
+	char msg[1400];
 	// memcpy(buf2,"/nc192.168.4.132",sizeof(char)*16);
 	
 	while(1)	
 	{
-		fgets(buf2,1000,stdin);						//read line
+		fgets(buf2,1500,stdin);						//read line
 		memset(destination,'\0',140*sizeof(char));	//clear memory
-		memset(msg, '\0', 140*sizeof(char));
+		memset(msg, '\0', 1400*sizeof(char));
 		memset(cmd, '\0', 4*sizeof(char));
 		int i = strlen(buf2)-1;						//delete CRLF
 		sscanf(buf2,"%s",cmd);
@@ -274,12 +301,22 @@ void consoleEngine()
 		{
 			int index = -1;
 			sscanf(buf2,"%s %d %99[a-zA-Z0-9 ]s",cmd,&index,msg);
+
 			sendMsg(msg,users[index].socketHandler,cmd);
 		}
 		else if(strncmp(buf2,"/us",3) == 0)
 		{
 			printAllListInfo(users,MAX_USERS);
 		}
+		else if(strncmp(buf2,"/me",3) == 0)
+		{
+			int index = -1;
+			sscanf(buf2,"%s %d %99[a-zA-Z0-9 ]s",cmd,&index,msg);
+			encrypt(msg, users[index].n, users[index].e, msg)
+			sendMsg(msg,users[index].socketHandler,cmd);
+			
+		}
+
 		memset(buf2,'\0',1000*sizeof(char));		//clear memory
 		fflush(stdin);
 		
@@ -291,10 +328,10 @@ void * chat (void * chatInfo)
 {
 	int chat = *(int *)chatInfo;
 	int n = 0;
-	char buf[140];
+	char buf[1400];
 	char cmd[4];
 	char source[20];
-	char msg[140];
+	char msg[BUF_SIZE];
 	setStatus(users,chat);
 	if (amIClient((users+chat)) == CLIENT)
 	{
@@ -310,7 +347,7 @@ void * chat (void * chatInfo)
 	while(1)
 	{
 		
-		memset(buf, '\0', 140*sizeof(char));
+		memset(buf, '\0', 1400*sizeof(char));
 		n = recv((users+chat)->socketHandler, buf, 140*sizeof(char), 0);
 		if (n < 0)
 		{
@@ -333,7 +370,10 @@ void * chat (void * chatInfo)
 
 			if(strncmp(cmd,"/me",3) == 0)
 			{
+				// FIND USER !!!!!
+				Decryptor(msg, msg, users[index]->d, users[index]->n);
 			//got encrypted message	
+				printf("received: %s\n", msg);
 
 			}
 			else if(strncmp(cmd,"/cn",3) == 0)
@@ -366,13 +406,13 @@ void * clientEngine(void * socketIn)
 	tv.tv_usec = 500;
 
 
-	char buf[140];
+	char buf[1400];
 	char buf2[1000];
 	
 		
 	char cmd[4];
 	char source[20];
-	char msg[140];
+	char msg[1400];
 	
 	int n, index;
 	struct sockaddr_in sad; /* structure to hold an IP address */
@@ -380,7 +420,7 @@ void * clientEngine(void * socketIn)
 	while(1)
 	{
 
-		memset(buf, '\0', 140*sizeof(char));
+		memset(buf, '\0', 1400*sizeof(char));
 		memset(cmd, '\0', 4*sizeof(char));
 
 		n = recv(socket, buf, sizeof(buf), 0);
@@ -390,7 +430,7 @@ void * clientEngine(void * socketIn)
 		
 			memset(cmd,'\0',4*sizeof(char));
 			memset(source,'\0',20*sizeof(char));
-			memset(msg,'\0',140*sizeof(char));
+			memset(msg,'\0',1400*sizeof(char));
 			
 			deserializer(buf,source,cmd,msg);
 			
@@ -421,6 +461,31 @@ void * clientEngine(void * socketIn)
 					users[index].socketHandler = New_Socket(&port);
 					
 					setStatus(users,index);
+===>>>>>
+					/**
+					Some magic here like next
+									for(i=0;i<strlen(msg);++i)
+				{
+					// printf("%d %s\n", i,localBuf+i);	
+					if(strncmp(msg+i,"@",1) == 0)
+					{
+						break;
+					}
+
+				}
+				if(i == strlen(msg))
+				{
+					printf("ERROR!\n");
+					
+				}
+				else
+				{
+					setDN(&users[index], msg, i);
+					
+				}
+
+					*/
+
 					memcpy(users[index].name, msg, strlen(msg)*sizeof(char));
 					
 					
@@ -494,6 +559,7 @@ void * clientEngine(void * socketIn)
 			}
 			else if(strncmp(cmd,"/cn",3) == 0)
 			{
+				
 				printf("received: %s\n", msg);
 			}
 
@@ -651,4 +717,269 @@ int openConnection(int socket)
 	}
 	return socket;
 
+}
+
+void encrypt(unsigned char *inMsg, BIGD n, BIGD e, unsigned char *outMsg)
+{
+	/* Create a PKCS#1 v1.5 EME message block in octet format */
+		/*
+		|<-----------------(klen bytes)--------------->|
+		+--+--+-------+--+-----------------------------+
+		|00|02|PADDING|00|      DATA TO ENCRYPT        |
+		+--+--+-------+--+-----------------------------+
+		The padding is made up of _at least_ eight non-zero random bytes.
+		*/
+	BIGD c, m;
+	c = bdNew();
+	m = bdNew();
+	int npad, i, mlen;
+	int klen = (KEYSIZE+7)/8;
+	unsigned char block[(KEYSIZE+7)/8];
+	unsigned char rb;
+	
+	/* CAUTION: make sure the block is at least klen bytes long */
+	memset(block, 0, klen);
+	mlen = strlen( (char*)inMsg );
+	npad = klen - mlen - 3;
+	if (npad < 8)	/* Note npad is a signed int, not a size_t */
+	{
+		printf("Message is too long\n");
+		exit(1);
+	}
+	/* Display */
+	//printf("Message='%s' ", inMsg);
+	//pr_bytesmsg("0x", inMsg, strlen((char*)inMsg));
+
+	/* Create encryption block */
+	block[0] = 0x00;
+	block[1] = 0x02;
+	/* Generate npad non-zero padding bytes - rand() is OK */
+	srand((unsigned)time(NULL));
+	for (i = 0; i < npad; i++)
+	{
+		while ((rb = (rand() & 0xFF)) == 0)
+			;/* loop until non-zero*/
+		block[i+2] = rb;
+	}
+	block[npad+2] = 0x00;
+	memcpy(&block[npad+3], inMsg, mlen);
+
+	/* Convert to BIGD format */
+	bdConvFromOctets(m, block, klen);
+
+	bdPrintHex("m=\n", m, "\n");
+
+	/* Encrypt c = m^e mod n */
+	bdModExp(c, m, e, n);
+	bdPrintHex("c=\n", c, "\n");
+	bdConvToHex(c, outMsg, BUF_SIZE);
+	printf("END of encryption %s\n", outMsg);
+	//bdConvToDecimal(c, outMsg,1000*sizeof(int)/*buffer size*/);
+	//return outMsg - our message
+	bdFree(&c);
+	bdFree(&m);
+}
+
+void Decryptor(unsigned char *inMsg, unsigned char *outMsg, BIGD d, BIGD n)
+{
+	unsigned char block[(KEYSIZE+7)/8];
+	// char msgstr[sizeof(block)];
+	int klen = (KEYSIZE+7)/8;
+	//int res; 
+	int i;
+	int nchars;
+	BIGD m1, c;
+	m1 = bdNew();
+	c = bdNew();
+
+	bdConvFromHex(c, inMsg);
+
+
+//	char msgstr[sizeof(block)];
+
+	//we take outMsg and conv it to bd
+
+	//bdConvFromDecimal(c, (const char*)outMsg);
+	/* Check decrypt m1 = c^d mod n */
+	
+	bdModExp(m1, c, d, n);
+
+	bdPrintHex("m'=\n", m1, "\n");
+	//res = bdCompare(m1, m);
+	//printf("Decryption %s\n", (res == 0 ? "OK" : "FAILED!"));
+	//assert(res == 0);
+	//printf("Decrypt by inversion took %.3f secs\n", tinv);
+
+	/* Extract the message bytes from the decrypted block */
+	memset(block, 0, klen);
+	bdConvToOctets(m1, block, klen);
+	assert(block[0] == 0x00);
+	assert(block[1] == 0x02);
+	for (i = 2; i < klen; i++)
+	{	/* Look for zero separating byte */
+		if (block[i] == 0x00)
+			break;
+	}
+	if (i >= klen)
+		printf("ERROR: failed to find message in decrypted block\n");
+	else
+	{
+		nchars = klen - i - 1;
+		memcpy(outMsg, &block[i+1], nchars);
+		outMsg[nchars] = '\0';
+		printf("Decrypted message is '%s'\n", outMsg);
+	}
+	bdFree(&m1);
+	bdFree(&c);
+}
+
+int generateRSAKey(BIGD n, BIGD e, BIGD d)
+{
+	size_t nbits = KEYSIZE;	/* NB a multiple of 8 here */
+	BIGD g, p1, q1, phi;
+	BIGD p, q, dP, dQ, qInv;
+	BD_RANDFUNC randFunc = bdRandomOctets;
+	unsigned ee = 0x3;
+	size_t np, nq;
+	size_t seedlen = 0;
+	size_t ntests = 50;
+	unsigned char *myseed = NULL;
+	unsigned char *seed = NULL;
+//	clock_t start, finish;
+//	double duration, tmake;
+	int res;
+
+	/* Initialise */
+	g = bdNew();
+	p1 = bdNew();
+	q1 = bdNew();
+	phi = bdNew();
+
+	p = bdNew();
+	q = bdNew();
+	dP = bdNew();
+	dQ = bdNew();
+	qInv = bdNew();
+
+	printf("Generating a %d-bit RSA key...\n", nbits);
+	
+	/* Set e as a BigDigit from short value ee */
+	bdSetShort(e, ee);
+	bdPrintHex("e=", e, "\n");
+
+	/* We add an extra byte to the user-supplied seed */
+	myseed = malloc(seedlen + 1);
+	if (!myseed) return -1;
+	memcpy(myseed, seed, seedlen);
+	/* Make sure seeds are slightly different for p and q */
+	myseed[seedlen] = 0x01;
+
+	/* Do (p, q) in two halves, approx equal */
+	nq = nbits / 2 ;
+	np = nbits - nq;
+
+	/* Compute two primes of required length with p mod e > 1 and *second* highest bit set */
+	// start = clock();
+	do {
+		bdGeneratePrime(p, np, ntests, myseed, seedlen+1, randFunc);
+		bdPrintHex("Try p=", p, "\n");
+	} while ((bdShortMod(g, p, ee) == 1) || bdGetBit(p, np-2) == 0);
+	// finish = clock();
+	// duration = (double)(finish - start) / CLOCKS_PER_SEC;
+	// tmake = duration;
+	// printf("p is %d bits, bit(%d) is %d\n", bdBitLength(p), np-2, bdGetBit(p,np-2));
+
+	myseed[seedlen] = 0xff;
+	// start = clock();
+	do {
+		bdGeneratePrime(q, nq, ntests, myseed, seedlen+1, randFunc);
+		bdPrintHex("Try q=", q, "\n");
+	} while ((bdShortMod(g, q, ee) == 1) || bdGetBit(q, nq-2) == 0);
+
+	// finish = clock();
+	// duration = (double)(finish - start) / CLOCKS_PER_SEC;
+	// tmake += duration;
+	// printf("q is %d bits, bit(%d) is %d\n", bdBitLength(q), nq-2, bdGetBit(q,nq-2));
+	// printf("Prime generation took %.3f secs\n", duration); 
+
+	/* Compute n = pq */
+	bdMultiply(n, p, q);
+	bdPrintHex("n=\n", n, "\n");
+	printf("n is %d bits\n", bdBitLength(n));
+	assert(bdBitLength(n) == nbits);
+
+	/* Check that p != q (if so, RNG is faulty!) */
+	assert(!bdIsEqual(p, q));
+
+	/* If q > p swap p and q so p > q */
+	if (bdCompare(p, q) < 1)
+	{	
+		printf("Swopping p and q so p > q...\n");
+		bdSetEqual(g, p);
+		bdSetEqual(p, q);
+		bdSetEqual(q, g);
+	}
+	bdPrintHex("p=", p, "\n");
+	bdPrintHex("q=", q, "\n");
+
+	/* Calc p-1 and q-1 */
+	bdSetEqual(p1, p);
+	bdDecrement(p1);
+	bdPrintHex("p-1=\n", p1, "\n");
+	bdSetEqual(q1, q);
+	bdDecrement(q1);
+	bdPrintHex("q-1=\n", q1, "\n");
+
+	/* Compute phi = (p-1)(q-1) */
+	bdMultiply(phi, p1, q1);
+	bdPrintHex("phi=\n", phi, "\n");
+
+	/* Check gcd(phi, e) == 1 */
+	bdGcd(g, phi, e);
+	bdPrintHex("gcd(phi,e)=", g, "\n");
+	assert(bdShortCmp(g, 1) == 0);
+
+	/* Compute inverse of e modulo phi: d = 1/e mod (p-1)(q-1) */
+	res = bdModInv(d, e, phi);
+	assert(res == 0);
+	bdPrintHex("d=\n", d, "\n");
+
+	/* Check ed = 1 mod phi */
+	bdModMult(g, e, d, phi);
+	bdPrintHex("ed mod phi=", g, "\n");
+	assert(bdShortCmp(g, 1) == 0);
+
+	/* Calculate CRT key values */
+	printf("CRT values:\n");
+	bdModInv(dP, e, p1);
+	bdModInv(dQ, e, q1);
+	bdModInv(qInv, q, p);
+	bdPrintHex("dP=", dP, "\n");
+	bdPrintHex("dQ=", dQ, "\n");
+	bdPrintHex("qInv=", qInv, "\n");
+
+	printf("n is %d bits\n", bdBitLength(n));
+
+	/* Clean up */
+	if (myseed) free(myseed);
+	bdFree(&g);
+	bdFree(&p1);
+	bdFree(&q1);
+	bdFree(&phi);
+
+	bdFree(&p);
+	bdFree(&q);
+	bdFree(&dP);
+	bdFree(&dQ);
+	bdFree(&qInv);
+
+	return 0;
+}
+void setDN(userInfo * user, unsigned char *msg, int i)
+{
+	memcpy(user->d,msg,(i)*sizeof(char));
+	memcpy(user->n,msg+i+1,strlen(msg)*sizeof(char));
+	printf("DONE SETTING KEYS\n");
+	printf("D:::%s\n", user->d);
+	printf("C:::%s\n", user->n);
 }
