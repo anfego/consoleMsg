@@ -316,9 +316,14 @@ void consoleEngine()
 			on = bdNew();
 			
 			sscanf(buf2,"%s %d %99[a-zA-Z0-9 ]s",cmd,&index,msg);
+			printf("N KEY is :%s\n", users[index].n);
+			printf("D KEY is :%s\n", users[index].d);
+
 			bdConvFromHex(on, users[index].n);
 			bdConvFromHex(oe, users[index].d);
-			encrypt(msg, oe, on, msg);
+			printf("GOING TO ENCRYPT\n");
+			encrypt(msg, on, oe, msg);
+			printf("DONE ! GOING TO DONE\n");
 			sendMsg(msg,users[index].socketHandler,cmd);
 			bdFree(&oe);
 			bdFree(&on);
@@ -334,9 +339,9 @@ void consoleEngine()
 }
 void * chat (void * chatInfo)
 {
-	BIGD oe, on;
+	// BIGD oe, on;
 	int chat = *(int *)chatInfo;
-	int n = 0;
+	// int n = 0;
 	char buf[1400];
 	char cmd[4];
 	char source[20];
@@ -382,13 +387,13 @@ void * chat (void * chatInfo)
 			{
 				// FIND USER !!!!!
 				// index = 
-				oe = bdNew();
-				on = bdNew();
-				bdConvFromHex(on, users[chat].n);
-				bdConvFromHex(oe, users[chat].d);
-				Decryptor(msg, msg, on, oe);
-				bdFree(&oe);
-				bdFree(&on);
+				// oe = bdNew();
+				// on = bdNew();
+				// bdConvFromHex(on, users[chat].n);
+				// bdConvFromHex(oe, users[chat].d);
+				Decryptor(msg, msg, n, e);
+				// bdFree(&oe);
+				// bdFree(&on);
 			//got encrypted message	
 				printf("received: %s\n", msg);
 
@@ -732,6 +737,8 @@ void encrypt(unsigned char *inMsg, BIGD n, BIGD e, unsigned char *outMsg)
 	int klen = (KEYSIZE+7)/8;
 	unsigned char block[(KEYSIZE+7)/8];
 	unsigned char rb;
+	bdPrintHex("N is=\n", n, "\n");
+	bdPrintHex("E is=\n", e, "\n");
 	
 	/* CAUTION: make sure the block is at least klen bytes long */
 	memset(block, 0, klen);
@@ -759,6 +766,7 @@ void encrypt(unsigned char *inMsg, BIGD n, BIGD e, unsigned char *outMsg)
 	}
 	block[npad+2] = 0x00;
 	memcpy(&block[npad+3], inMsg, mlen);
+	printf("BLOCK: %s\n", block);
 
 	/* Convert to BIGD format */
 	bdConvFromOctets(m, block, klen);
