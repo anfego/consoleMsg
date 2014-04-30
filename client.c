@@ -262,7 +262,7 @@ void consoleEngine()
 	char buf[140];
 	char destination[140];
 	memset(buf, '\0', 140*sizeof(char));
-	int n, index;
+	int index;
 
 	char buf2[1500];
 	memset(buf2,'\0',sizeof(buf2));	//clear memory
@@ -387,13 +387,13 @@ void * chat (void * chatInfo)
 			{
 				//Here both sides recieve here
 				//each side have to use the chat key
-				oe = bdNew();
-				on = bdNew();
-				bdConvFromHex(on, users[chat].n);
-				bdConvFromHex(oe, users[chat].d);
-				Decryptor(msg, msg, on, oe);
-				bdFree(&oe);
-				bdFree(&on);
+				// oe = bdNew();
+				// on = bdNew();
+				// bdConvFromHex(on, users[chat].n);
+				// bdConvFromHex(oe, users[chat].d);
+				Decryptor(msg, msg, e, n);
+				// bdFree(&oe);
+				// bdFree(&on);
 			//got encrypted message	
 				printf("received: %s\n", msg);
 
