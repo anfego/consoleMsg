@@ -459,7 +459,7 @@ void * clientEngine(void * socketIn)
 	char source[20];
 	char msg[1400];
 	
-	int received, index, i;
+	int received, index;
 	struct sockaddr_in sad; /* structure to hold an IP address */
 	
 	while(1)
@@ -492,13 +492,15 @@ void * clientEngine(void * socketIn)
 				{							//send to all clients
 					if(users[i].status == 1)
 					{
-						pthread_cancel(users[i].userPThread);
-						closeConnection(users[i].socketHandler);
+						printf("Closing Chat %d\n",i);
+						// pthread_cancel(users[i].userPThread);
+						closesocket(users[i].socketHandler);
 					}
 				}
 				closesocket(socket);
 				printf(" .\n");
 				fflush(stdout);
+				exit(0);
 				break;
 
 			}
