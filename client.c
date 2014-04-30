@@ -257,6 +257,7 @@ int sendMsg(char * msg, int socket,char * cmd)
 }
 void consoleEngine()
 {
+	BIGD oe, on;
 	char buf[140];
 	char destination[140];
 	memset(buf, '\0', 140*sizeof(char));
@@ -311,9 +312,16 @@ void consoleEngine()
 		else if(strncmp(buf2,"/me",3) == 0)
 		{
 			int index = -1;
+			oe = bdNew();
+			on = bdNew();
+			
 			sscanf(buf2,"%s %d %99[a-zA-Z0-9 ]s",cmd,&index,msg);
-			encrypt(msg, users[index].n, users[index].e, msg)
+			bdConvFromHex(on, users[index].n);
+			bdConvFromHex(oe, users[index].d);
+			encrypt(msg, oe, on, msg);
 			sendMsg(msg,users[index].socketHandler,cmd);
+			bdFree(&oe);
+			bdFree(&on);
 			
 		}
 
@@ -326,6 +334,7 @@ void consoleEngine()
 }
 void * chat (void * chatInfo)
 {
+	BIGD oe, on;
 	int chat = *(int *)chatInfo;
 	int n = 0;
 	char buf[1400];
@@ -333,6 +342,7 @@ void * chat (void * chatInfo)
 	char source[20];
 	char msg[BUF_SIZE];
 	setStatus(users,chat);
+	int index = -1;
 	if (amIClient((users+chat)) == CLIENT)
 	{
 		(users+chat)->socketHandler = createSocket((users+chat)->name, (users+chat)->port);
@@ -371,7 +381,14 @@ void * chat (void * chatInfo)
 			if(strncmp(cmd,"/me",3) == 0)
 			{
 				// FIND USER !!!!!
-				Decryptor(msg, msg, users[index]->d, users[index]->n);
+				// index = 
+				oe = bdNew();
+				on = bdNew();
+				bdConvFromHex(on, users[chat].n);
+				bdConvFromHex(oe, users[chat].d);
+				Decryptor(msg, msg, on, oe);
+				bdFree(&oe);
+				bdFree(&on);
 			//got encrypted message	
 				printf("received: %s\n", msg);
 
@@ -386,7 +403,9 @@ void * chat (void * chatInfo)
 				break;
 			}
 		}
+	
 	}
+	
 }
 void * clientEngine(void * socketIn)
 {
@@ -461,14 +480,14 @@ void * clientEngine(void * socketIn)
 					users[index].socketHandler = New_Socket(&port);
 					
 					setStatus(users,index);
-					sscanf(msg,"%s %s",sers[index].name, users[index].d, users[index].n);
+					sscanf(msg,"%s %s %s",users[index].name, users[index].d, users[index].n);
 
-					memcpy(users[index].name, msg, strlen(msg)*sizeof(char));
+					// memcpy(users[index].name, msg, strlen(msg)*sizeof(char));
 					
 					
 						
 					
-					memcpy(buf2,msg,strlen(msg)*sizeof(char));
+					memcpy(buf2,users[index].name,strlen(users[index].name)*sizeof(char));
 					memcpy(buf2+strlen(buf2),"#",sizeof(char));
 					
 					sprintf(buf2+strlen(buf2),"%d",port);
