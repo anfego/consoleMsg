@@ -371,8 +371,8 @@ void * socRead(void * args)
 				memcpy(buf2+strlen(buf2),msg2,strlen(msg2)*sizeof(char));
 
 				iSource = getUserByName(users,source,MAX_USERS);
-				// sprintf(buf2 + strlen(buf2),"#%s %s",users[index].d,users[index].n  );
-				// printf("buf2: %s\n", buf2 );
+				sprintf(buf2 + strlen(buf2),"#%s %s",users[index].d,users[index].n  );
+				printf("buf2: %s\n", buf2 );
 				sendMsg(buf2, users[iSource].socketHandler,"/so");
 				
 			}
