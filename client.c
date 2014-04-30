@@ -59,6 +59,7 @@ pthread_t  sendAllThrd;// usersThrd[MAX_THREAD],
 int newConnection = 0;//new connection flag: 1 - if a new connection is to be established;
 int CurrConnIDX = 0; // counts latest element in pthread array
 int error = 0;//use for phtread error during creation
+int debug = 0;
 /*******************************************************/
 // Encryption vars
 BIGD n, e, d;
@@ -96,6 +97,12 @@ void setDN(userInfo * user, unsigned char *msg, int i);
 int main(int argc, char *argv[])
 {
 	//Zero all connection Status
+	if(argc > 2 && *argv[2] == 'd')
+	{
+		debug = 1;
+		printf("DEBUG INFO\n");
+	}
+
 	char buf[1000];
 	zeroStatus(users,MAX_USERS);
 
@@ -176,7 +183,8 @@ int createSocket(char* host, int portIn)
 	
 	memcpy(&sad.sin_addr, ptrh->h_addr, ptrh->h_length);
 	/* Map TCP transport protocol name to protocol number. */
-	printf("*\n");
+	if(debug == 1)
+		printf("*\n");
 	if ( ((int)(ptrp = getprotobyname("tcp"))) == 0) 
 	{
 		fprintf(stderr, "cannot map \"tcp\" to protocol number");
@@ -185,7 +193,8 @@ int createSocket(char* host, int portIn)
 	
 	/* Create a socket. */
 	sd = socket(PF_INET, SOCK_STREAM, ptrp->p_proto);
-	printf("*\n");
+	if(debug == 1)
+		printf("*\n");
 	if (sd < 0) 
 	{
 		fprintf(stderr, "socket creation failed\n");
@@ -193,13 +202,15 @@ int createSocket(char* host, int portIn)
 	}
 	
 	/* Connect the socket to the specified server. */
-	printf("*\n");
+	
+	printf("connected !\n");
 	if (connect(sd, (struct sockaddr *)&sad, sizeof(sad)) < 0) 
 	{
 		fprintf(stderr,"connect failed\n");
 		return -1;
 	}
-	printf("5\n");
+	if(debug == 1)
+		printf("5\n");
 	return sd;
 }
 int login(int socketHandler)
@@ -302,7 +313,7 @@ void consoleEngine()
 		else if(strncmp(cmd,"/cn",3) == 0)
 		{
 			int index = -1;
-			sscanf(buf2,"%s %d %99[a-zA-Z0-9 ]s",cmd,&index,msg);
+			sscanf(buf2,"%s %d %99[a-zA-Z0-9,.!? ]s",cmd,&index,msg);
 
 			sendMsg(msg,users[index].socketHandler,cmd);
 		}
@@ -316,15 +327,19 @@ void consoleEngine()
 			oe = bdNew();
 			on = bdNew();
 			
-			sscanf(buf2,"%s %d %99[a-zA-Z0-9 ]s",cmd,&index,msg);
-			printf("N KEY is :%s\n", users[index].n);
-			printf("D KEY is :%s\n", users[index].d);
-
+			sscanf(buf2,"%s %d %99[a-zA-Z0-9,.!? ]s",cmd,&index,msg);
+			if(debug == 1)
+			{
+				printf("N KEY is :%s\n", users[index].n);
+				printf("D KEY is :%s\n", users[index].d);
+			}
 			bdConvFromHex(on, users[index].n);
 			bdConvFromHex(oe, users[index].d);
-			printf("GOING TO ENCRYPT\n");
+			if(debug == 1)
+				printf("GOING TO ENCRYPT\n");
 			encrypt(msg, on, oe, msg);
-			printf("DONE ! GOING TO DONE\n");
+			if(debug == 1)
+				printf("DONE ! GOING TO DONE\n");
 			sendMsg(msg,users[index].socketHandler,cmd);
 			bdFree(&oe);
 			bdFree(&on);
@@ -379,9 +394,12 @@ void * chat (void * chatInfo)
 			
 			deserializer(buf,source,cmd,msg);
 			
-			printf("CMD: %s\n", cmd );
-			printf("Source: %s\n", source );
-			printf("MSG: %s\n", msg );
+			if(debug == 1)
+			{
+				printf("CMD: %s\n", cmd );
+				printf("Source: %s\n", source );
+				printf("MSG: %s\n", msg );
+			}
 
 			if(strncmp(cmd,"/me",3) == 0)
 			{
@@ -480,9 +498,12 @@ void * clientEngine(void * socketIn)
 			
 			deserializer(buf,source,cmd,msg);
 			
-			printf("CMD: %s\n", cmd );
-			printf("Source: %s\n", source );
-			printf("MSG: %s\n", msg );
+			if(debug == 1)
+			{
+				printf("CMD: %s\n", cmd );
+				printf("Source: %s\n", source );
+				printf("MSG: %s\n", msg );
+			}
 
 			if(strncmp(cmd,"/ex",3) == 0)
 			{
@@ -573,7 +594,8 @@ void * clientEngine(void * socketIn)
 
 				setPort(users,index,port);
 				setRole(users,index,CLIENT);
-				printf("\nRECIEVED IN /SO %s\n", msg );
+				if(debug == 1)
+					printf("\nRECIEVED IN /SO %s\n", msg );
 				memset(users[index].d, '\0', 300*sizeof(char));
 				memset(users[index].n, '\0', 300*sizeof(char));
 
@@ -582,7 +604,8 @@ void * clientEngine(void * socketIn)
 				setChatKeyN(users, index, users[index].n);
 				// bdConvToHex(d, (users+chat)->d, BUF_SIZE);
 				// bdConvToHex(n, (users+chat)->n, BUF_SIZE);
-
+			if(debug == 1)
+			{
 				printf("\n");
 				printf("\n");
 
@@ -590,7 +613,7 @@ void * clientEngine(void * socketIn)
 
 				printf("\n");
 				printf("\n");
-				
+			}	
 				if ((error = pthread_create(
 										&(users[index].userPThread),
 										NULL,
@@ -603,7 +626,7 @@ void * clientEngine(void * socketIn)
 
 
 			}
-			else if(strncmp(cmd,"/cn",3) == 0)
+			else if(strncmp(cmd,"/cn",3) == 0 && debug == 1)
 			{
 				
 				printf("received: %s\n", msg);
@@ -782,9 +805,11 @@ void encrypt(unsigned char *inMsg, BIGD n, BIGD e, unsigned char *outMsg)
 	int klen = (KEYSIZE+7)/8;
 	unsigned char block[(KEYSIZE+7)/8];
 	unsigned char rb;
-	bdPrintHex("N is=\n", n, "\n");
-	bdPrintHex("E is=\n", e, "\n");
-	
+	if(debug == 1)
+	{
+		bdPrintHex("N is=\n", n, "\n");
+		bdPrintHex("E is=\n", e, "\n");
+	}	
 	/* CAUTION: make sure the block is at least klen bytes long */
 	memset(block, 0, klen);
 	mlen = strlen( (char*)inMsg );
@@ -811,18 +836,22 @@ void encrypt(unsigned char *inMsg, BIGD n, BIGD e, unsigned char *outMsg)
 	}
 	block[npad+2] = 0x00;
 	memcpy(&block[npad+3], inMsg, mlen);
-	printf("BLOCK: %s\n", block);
+	if(debug == 1)
+		printf("BLOCK: %s\n", block);
 
 	/* Convert to BIGD format */
 	bdConvFromOctets(m, block, klen);
 
-	bdPrintHex("m=\n", m, "\n");
+	if(debug == 1)
+		bdPrintHex("m=\n", m, "\n");
 
 	/* Encrypt c = m^e mod n */
 	bdModExp(c, m, e, n);
-	bdPrintHex("c=\n", c, "\n");
+	if(debug == 1)
+		bdPrintHex("c=\n", c, "\n");
 	bdConvToHex(c, outMsg, BUF_SIZE);
-	printf("END of encryption %s\n", outMsg);
+	if(debug == 1)
+		printf("END of encryption %s\n", outMsg);
 	//bdConvToDecimal(c, outMsg,1000*sizeof(int)/*buffer size*/);
 	//return outMsg - our message
 	bdFree(&c);
@@ -852,8 +881,8 @@ void Decryptor(unsigned char *inMsg, unsigned char *outMsg, BIGD d, BIGD n)
 	/* Check decrypt m1 = c^d mod n */
 	
 	bdModExp(m1, c, d, n);
-
-	bdPrintHex("m'=\n", m1, "\n");
+	if(debug == 1)
+		bdPrintHex("m'=\n", m1, "\n");
 	//res = bdCompare(m1, m);
 	//printf("Decryption %s\n", (res == 0 ? "OK" : "FAILED!"));
 	//assert(res == 0);
@@ -876,7 +905,8 @@ void Decryptor(unsigned char *inMsg, unsigned char *outMsg, BIGD d, BIGD n)
 		nchars = klen - i - 1;
 		memcpy(outMsg, &block[i+1], nchars);
 		outMsg[nchars] = '\0';
-		printf("Decrypted message is '%s'\n", outMsg);
+		if(debug == 1)
+			printf("Decrypted message is '%s'\n", outMsg);
 	}
 	bdFree(&m1);
 	bdFree(&c);
@@ -909,12 +939,13 @@ int generateRSAKey(BIGD n, BIGD e, BIGD d)
 	dP = bdNew();
 	dQ = bdNew();
 	qInv = bdNew();
-
-	printf("Generating a %d-bit RSA key...\n", nbits);
+	if(debug == 1)
+		printf("Generating a %d-bit RSA key...\n", nbits);
 	
 	/* Set e as a BigDigit from short value ee */
 	bdSetShort(e, ee);
-	bdPrintHex("e=", e, "\n");
+	if(debug == 1)
+		bdPrintHex("e=", e, "\n");
 
 	/* We add an extra byte to the user-supplied seed */
 	myseed = malloc(seedlen + 1);
@@ -931,7 +962,8 @@ int generateRSAKey(BIGD n, BIGD e, BIGD d)
 	// start = clock();
 	do {
 		bdGeneratePrime(p, np, ntests, myseed, seedlen+1, randFunc);
-		bdPrintHex("Try p=", p, "\n");
+		if(debug == 1)
+			bdPrintHex("Try p=", p, "\n");
 	} while ((bdShortMod(g, p, ee) == 1) || bdGetBit(p, np-2) == 0);
 	// finish = clock();
 	// duration = (double)(finish - start) / CLOCKS_PER_SEC;
@@ -942,7 +974,8 @@ int generateRSAKey(BIGD n, BIGD e, BIGD d)
 	// start = clock();
 	do {
 		bdGeneratePrime(q, nq, ntests, myseed, seedlen+1, randFunc);
-		bdPrintHex("Try q=", q, "\n");
+		if(debug == 1)
+			bdPrintHex("Try q=", q, "\n");
 	} while ((bdShortMod(g, q, ee) == 1) || bdGetBit(q, nq-2) == 0);
 
 	// finish = clock();
@@ -953,8 +986,11 @@ int generateRSAKey(BIGD n, BIGD e, BIGD d)
 
 	/* Compute n = pq */
 	bdMultiply(n, p, q);
-	bdPrintHex("n=\n", n, "\n");
-	printf("n is %d bits\n", bdBitLength(n));
+	if(debug == 1)
+	{
+		bdPrintHex("n=\n", n, "\n");
+		printf("n is %d bits\n", bdBitLength(n));
+	}
 	assert(bdBitLength(n) == nbits);
 
 	/* Check that p != q (if so, RNG is faulty!) */
@@ -963,52 +999,64 @@ int generateRSAKey(BIGD n, BIGD e, BIGD d)
 	/* If q > p swap p and q so p > q */
 	if (bdCompare(p, q) < 1)
 	{	
-		printf("Swopping p and q so p > q...\n");
+		if(debug == 1)
+			printf("Swopping p and q so p > q...\n");
 		bdSetEqual(g, p);
 		bdSetEqual(p, q);
 		bdSetEqual(q, g);
 	}
-	bdPrintHex("p=", p, "\n");
-	bdPrintHex("q=", q, "\n");
-
+	if(debug == 1)
+	{
+		bdPrintHex("p=", p, "\n");
+		bdPrintHex("q=", q, "\n");
+	}
 	/* Calc p-1 and q-1 */
 	bdSetEqual(p1, p);
 	bdDecrement(p1);
-	bdPrintHex("p-1=\n", p1, "\n");
+	if(debug == 1)
+		bdPrintHex("p-1=\n", p1, "\n");
 	bdSetEqual(q1, q);
 	bdDecrement(q1);
-	bdPrintHex("q-1=\n", q1, "\n");
+	if(debug == 1)
+		bdPrintHex("q-1=\n", q1, "\n");
 
 	/* Compute phi = (p-1)(q-1) */
 	bdMultiply(phi, p1, q1);
-	bdPrintHex("phi=\n", phi, "\n");
+	if(debug == 1)
+		bdPrintHex("phi=\n", phi, "\n");
 
 	/* Check gcd(phi, e) == 1 */
 	bdGcd(g, phi, e);
-	bdPrintHex("gcd(phi,e)=", g, "\n");
+	if(debug == 1)
+		bdPrintHex("gcd(phi,e)=", g, "\n");
 	assert(bdShortCmp(g, 1) == 0);
 
 	/* Compute inverse of e modulo phi: d = 1/e mod (p-1)(q-1) */
 	res = bdModInv(d, e, phi);
 	assert(res == 0);
-	bdPrintHex("d=\n", d, "\n");
+	if(debug == 1)
+		bdPrintHex("d=\n", d, "\n");
 
 	/* Check ed = 1 mod phi */
 	bdModMult(g, e, d, phi);
-	bdPrintHex("ed mod phi=", g, "\n");
+	if(debug == 1)
+		bdPrintHex("ed mod phi=", g, "\n");
 	assert(bdShortCmp(g, 1) == 0);
 
 	/* Calculate CRT key values */
-	printf("CRT values:\n");
+	if(debug == 1)
+		printf("CRT values:\n");
 	bdModInv(dP, e, p1);
 	bdModInv(dQ, e, q1);
 	bdModInv(qInv, q, p);
-	bdPrintHex("dP=", dP, "\n");
-	bdPrintHex("dQ=", dQ, "\n");
-	bdPrintHex("qInv=", qInv, "\n");
+	if(debug == 1)
+	{
+		bdPrintHex("dP=", dP, "\n");
+		bdPrintHex("dQ=", dQ, "\n");
+		bdPrintHex("qInv=", qInv, "\n");
 
-	printf("n is %d bits\n", bdBitLength(n));
-
+		printf("n is %d bits\n", bdBitLength(n));
+	}
 	/* Clean up */
 	if (myseed) free(myseed);
 	bdFree(&g);
@@ -1028,7 +1076,10 @@ void setDN(userInfo * user, unsigned char *msg, int i)
 {
 	memcpy(user->d,msg,(i)*sizeof(char));
 	memcpy(user->n,msg+i+1,strlen(msg)*sizeof(char));
-	printf("DONE SETTING KEYS\n");
-	printf("D:::%s\n", user->d);
-	printf("C:::%s\n", user->n);
+	if(debug == 1)
+	{
+		printf("DONE SETTING KEYS\n");
+		printf("D:::%s\n", user->d);
+		printf("C:::%s\n", user->n);
+	}
 }
