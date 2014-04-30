@@ -336,7 +336,10 @@ void * socRead(void * args)
 					//accepted
 					printf("Request connection to %s\n",users[index].name );
 					printf("Request connection from %s\n",source);
-					sendMsg(source, users[index].socketHandler,"/rq");
+					memset(buf,'\0',1500*sizeof(char));
+					iSource = getUserByName(users,source,MAX_USERS);
+					sprintf(buf,"%d#%s@%s",port,users[iSource].d,users[iSource].n  );
+					sendMsg(buf, users[index].socketHandler,"/rq");
 					// rqNewConnection(users[index].socketHandler, source, nameLen);
 				}
 				else
@@ -363,8 +366,9 @@ void * socRead(void * args)
 				printf("MSG 2: %s\n", msg2 );
 				
 				memcpy(buf2+strlen(buf2),msg2,strlen(msg2)*sizeof(char));
-				
+
 				iSource = getUserByName(users,source,MAX_USERS);
+				sprintf(buf2 + strlen(buf2),"#%s@%s",users[iSource].d,users[iSource].n  );
 				printf("buf2: %s\n", buf2 );
 				sendMsg(buf2, users[iSource].socketHandler,"/so");
 				
