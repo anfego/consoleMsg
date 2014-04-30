@@ -228,7 +228,6 @@ void * socRead(void * args)
 	while (1) 
 	{
 		memset(buf,'\0',1500*sizeof(char));
-		memset(buf2,'\0',1000*sizeof(char));
 
 		// bzero(&sender, sizeof(sender));
 		//extracts the command from the IN buffer
@@ -236,6 +235,7 @@ void * socRead(void * args)
 		if (n > 0)
 		{
 			printf("\nEndOfOneWhileCycle%s\n",buf);
+			memset(buf2,'\0',1000*sizeof(char));
 			memset(cmd,'\0',4*sizeof(char));
 			memset(source,'\0',20*sizeof(char));
 			memset(msg,'\0',1400*sizeof(char));
@@ -300,6 +300,7 @@ void * socRead(void * args)
 				}
 				else
 				{
+					printf("\t\tLOGIN BUFFER\n%s\n",msg);
 					setDN(&users[index], msg, i);
 					
 				}
@@ -370,8 +371,8 @@ void * socRead(void * args)
 				memcpy(buf2+strlen(buf2),msg2,strlen(msg2)*sizeof(char));
 
 				iSource = getUserByName(users,source,MAX_USERS);
-				sprintf(buf2 + strlen(buf2),"#%s %s",users[index].d,users[index].n  );
-				printf("buf2: %s\n", buf2 );
+				// sprintf(buf2 + strlen(buf2),"#%s %s",users[index].d,users[index].n  );
+				// printf("buf2: %s\n", buf2 );
 				sendMsg(buf2, users[iSource].socketHandler,"/so");
 				
 			}
@@ -390,6 +391,8 @@ void * socRead(void * args)
 }
 void setDN(userInfo * user, unsigned char *msg, int i)
 {
+	memset(user->d,'\0',BUF_SIZE);
+	memset(user->n,'\0',BUF_SIZE);
 	memcpy(user->d,msg,(i)*sizeof(char));
 	memcpy(user->n,msg+i+1,strlen(msg)*sizeof(char));
 	printf("DONE SETTING KEYS\n");
@@ -404,9 +407,9 @@ void * SendAll(void * args)
 	int i;
 	while(1)
 	{
-		memset(buf2,0,sizeof(buf2));	//clear memory
-		fgets(buf2,30,stdin);			//read line
-		i = strlen(buf2)-1;				//delete CRLF
+		memset(buf2,'\0',1000*sizeof(char));	//clear memory
+		fgets(buf2,30,stdin);					//read line
+		i = strlen(buf2)-1;						//delete CRLF
 		if(buf2[i]=='\n') 
 			buf2[i] = '\0';
 		if(!strcmp(buf2,"exit")|| exitFlag )

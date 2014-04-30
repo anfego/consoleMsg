@@ -207,11 +207,12 @@ int login(int socketHandler)
 
 	char buf2[2*BUF_SIZE+30];
 	int size = 0;
-	memset(buf2, '\0', 2*BUF_SIZE+30);
+	memset(buf2, '\0', (2*BUF_SIZE+30)*sizeof(char));
 	bdConvToHex(d, buf2, BUF_SIZE);
 	size = strlen(buf2);
 	buf2[size] = '@';
 	bdConvToHex(n, buf2+size+1, BUF_SIZE);
+	printf("KEYS OUT\n\t\t\t%s\n",buf2);
 	sendMsg(buf2,socketHandler,"/lg");
 	
 	return 0;
@@ -231,7 +232,7 @@ int sendMsg(char * msg, int socket,char * cmd)
 	char myIp[140];
 	char bufOut[1000];
 	
-	memset(bufOut,'\0',200*sizeof(char));
+	memset(bufOut,'\0',1000*sizeof(char));
 	
 	getMyIp(myIp,socket);
 	
@@ -339,9 +340,9 @@ void consoleEngine()
 }
 void * chat (void * chatInfo)
 {
-	// BIGD oe, on;
+	BIGD oe, on;
 	int chat = *(int *)chatInfo;
-	// int n = 0;
+	int received = 0;
 	char buf[1400];
 	char cmd[4];
 	char source[20];
@@ -351,6 +352,11 @@ void * chat (void * chatInfo)
 	if (amIClient((users+chat)) == CLIENT)
 	{
 		(users+chat)->socketHandler = createSocket((users+chat)->name, (users+chat)->port);
+		//set chat keys as its own
+		memset((users+chat)->d, '\0', BUF_SIZE*sizeof(char));
+		memset((users+chat)->n, '\0', BUF_SIZE*sizeof(char));
+		bdConvToHex(d, (users+chat)->d, BUF_SIZE);
+		bdConvToHex(n, (users+chat)->n, BUF_SIZE);
 		
 	}
 	else
@@ -363,19 +369,19 @@ void * chat (void * chatInfo)
 	{
 		
 		memset(buf, '\0', 1400*sizeof(char));
-		n = recv((users+chat)->socketHandler, buf, 140*sizeof(char), 0);
-		if (n < 0)
+		received = recv((users+chat)->socketHandler, buf, 1400*sizeof(char), 0);
+		if (received < 0)
 		{
 	
 			Error_Check(-1,"Reading socket");
 			exit(0);
 		}
-		if(n > 0)
+		if(received > 0)
 		{
 			fflush(stdout);
 			memset(cmd,'\0',4*sizeof(char));
 			memset(source,'\0',20*sizeof(char));
-			memset(msg,'\0',140*sizeof(char));
+			memset(msg,'\0',BUF_SIZE*sizeof(char));
 			
 			deserializer(buf,source,cmd,msg);
 			
@@ -385,15 +391,15 @@ void * chat (void * chatInfo)
 
 			if(strncmp(cmd,"/me",3) == 0)
 			{
-				// FIND USER !!!!!
-				// index = 
-				// oe = bdNew();
-				// on = bdNew();
-				// bdConvFromHex(on, users[chat].n);
-				// bdConvFromHex(oe, users[chat].d);
-				Decryptor(msg, msg, n, e);
-				// bdFree(&oe);
-				// bdFree(&on);
+				//Here both sides recieve here
+				//each side have to use the chat key
+				oe = bdNew();
+				on = bdNew();
+				bdConvFromHex(on, users[chat].n);
+				bdConvFromHex(oe, users[chat].d);
+				Decryptor(msg, msg, on, oe);
+				bdFree(&oe);
+				bdFree(&on);
 			//got encrypted message	
 				printf("received: %s\n", msg);
 
@@ -488,7 +494,7 @@ void * clientEngine(void * socketIn)
 					sscanf(msg,"%s %s %s",users[index].name, users[index].d, users[index].n);
 
 					// memcpy(users[index].name, msg, strlen(msg)*sizeof(char));
-					
+					printf("KEY received for %d:\t%s\n", index, users[index].d);
 					
 						
 					

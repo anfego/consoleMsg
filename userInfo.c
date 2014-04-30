@@ -85,6 +85,7 @@ void printAllListInfo(userInfo * users,int numElements)
 void printUserInfo(userInfo * user)
 {
 	printf("User: %s, socket: %d, status: %d myRole: %d\n",user->name, user->socketHandler, user->status, user->myRole);
+	printf("N: %s\nKey: %s\n",user->n, user->d);
 }
 
 int amIClient(userInfo * chatInfo)
