@@ -385,17 +385,32 @@ void * chat (void * chatInfo)
 
 			if(strncmp(cmd,"/me",3) == 0)
 			{
+			// 	//Here both sides recieve here
+			// 	//each side have to use the chat key
+			// 	oe = bdNew();
+			// 	on = bdNew();
+			// 	bdConvFromHex(on, users[chat].n);
+			// 	bdConvFromHex(oe, users[chat].d);
+			// 	Decryptor(msg, msg, on, oe);
+			// 	bdFree(&oe);
+			// 	bdFree(&on);
+			// //got encrypted message	
+			// 	printf("received: %s\n", msg);
+
+
 				//Here both sides recieve here
 				//each side have to use the chat key
-				oe = bdNew();
-				on = bdNew();
-				bdConvFromHex(on, users[chat].n);
-				bdConvFromHex(oe, users[chat].d);
-				Decryptor(msg, msg, on, oe);
-				bdFree(&oe);
-				bdFree(&on);
-			//got encrypted message	
+				// oe = bdNew();
+				// on = bdNew();
+				// bdConvFromHex(on, users[chat].n);
+				// bdConvFromHex(oe, users[chat].d);
+				Decryptor(msg, msg, n, e);
+				// bdFree(&oe);
+				// bdFree(&on);
+				//got encrypted message	
 				printf("received: %s\n", msg);
+
+				}
 
 			}
 			else if(strncmp(cmd,"/cn",3) == 0)
