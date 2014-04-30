@@ -338,7 +338,7 @@ void * socRead(void * args)
 					printf("Request connection from %s\n",source);
 					memset(buf,'\0',1500*sizeof(char));
 					iSource = getUserByName(users,source,MAX_USERS);
-					sprintf(buf,"%d#%s@%s",port,users[iSource].d,users[iSource].n  );
+					sprintf(buf,"%s %s %s",source, users[iSource].d,users[iSource].n  );
 					sendMsg(buf, users[index].socketHandler,"/rq");
 					// rqNewConnection(users[index].socketHandler, source, nameLen);
 				}

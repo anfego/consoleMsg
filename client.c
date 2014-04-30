@@ -461,30 +461,7 @@ void * clientEngine(void * socketIn)
 					users[index].socketHandler = New_Socket(&port);
 					
 					setStatus(users,index);
-===>>>>>
-					/**
-					Some magic here like next
-									for(i=0;i<strlen(msg);++i)
-				{
-					// printf("%d %s\n", i,localBuf+i);	
-					if(strncmp(msg+i,"@",1) == 0)
-					{
-						break;
-					}
-
-				}
-				if(i == strlen(msg))
-				{
-					printf("ERROR!\n");
-					
-				}
-				else
-				{
-					setDN(&users[index], msg, i);
-					
-				}
-
-					*/
+					sscanf(msg,"%s %s",sers[index].name, users[index].d, users[index].n);
 
 					memcpy(users[index].name, msg, strlen(msg)*sizeof(char));
 					
