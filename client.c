@@ -205,9 +205,9 @@ int createSocket(char* host, int portIn)
 int login(int socketHandler)
 {
 
-	char buf2[2*BUF_SIZE];
+	char buf2[2*BUF_SIZE+30];
 	int size = 0;
-	memset(buf2, '\0', 2*BUF_SIZE);
+	memset(buf2, '\0', 2*BUF_SIZE+30);
 	bdConvToHex(d, buf2, BUF_SIZE);
 	size = strlen(buf2);
 	buf2[size] = '@';

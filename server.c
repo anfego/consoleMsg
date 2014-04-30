@@ -101,7 +101,7 @@ int main(int argc, char const *argv[])
 	n = bdNew();
 	e = bdNew();
 	d = bdNew();
-	generateRSAKey(n, e, d);
+	// generateRSAKey(n, e, d);
 	
 	
 	memset((char *)&sad,0,sizeof(sad)); /* clear sockaddr structure */
@@ -359,6 +359,8 @@ void * socRead(void * args)
 
 				memset(msg2,'\0',1000*sizeof(char));
 
+				index = getUserByName(users,source,MAX_USERS);
+
 				deserializer2(msg,source,msg2);
 
 				printf("FROM: %s\n", source );
@@ -368,7 +370,7 @@ void * socRead(void * args)
 				memcpy(buf2+strlen(buf2),msg2,strlen(msg2)*sizeof(char));
 
 				iSource = getUserByName(users,source,MAX_USERS);
-				sprintf(buf2 + strlen(buf2),"#%s@%s",users[iSource].d,users[iSource].n  );
+				sprintf(buf2 + strlen(buf2),"#%s %s",users[index].d,users[index].n  );
 				printf("buf2: %s\n", buf2 );
 				sendMsg(buf2, users[iSource].socketHandler,"/so");
 				
@@ -547,9 +549,9 @@ void deserializer2(const char * buf,char * source,char * msg)
 int sendMsg(char * msg, int socket,char * cmd)
 {
 	char myIp[140];
-	char bufOut[200];
+	char bufOut[2000];
 	
-	memset(bufOut,'\0',200*sizeof(char));
+	memset(bufOut,'\0',2000*sizeof(char));
 	
 	getMyIp(myIp,socket);
 	
