@@ -371,7 +371,7 @@ void * socRead(void * args)
 				memcpy(buf2+strlen(buf2),msg2,strlen(msg2)*sizeof(char));
 
 				iSource = getUserByName(users,source,MAX_USERS);
-				sprintf(buf2 + strlen(buf2),"#%s %s",users[index].d,users[index].n  );
+				sprintf(buf2 + strlen(buf2)," %s %s",users[index].d,users[index].n  );
 				printf("buf2: %s\n", buf2 );
 				sendMsg(buf2, users[iSource].socketHandler,"/so");
 				
@@ -396,8 +396,8 @@ void setDN(userInfo * user, unsigned char *msg, int i)
 	memcpy(user->d,msg,(i)*sizeof(char));
 	memcpy(user->n,msg+i+1,strlen(msg)*sizeof(char));
 	printf("DONE SETTING KEYS\n");
-	printf("D:::%s\n", user->d);
-	printf("C:::%s\n", user->n);
+	printf("D:::\n%s\n", user->d);
+	printf("C:::\n%s\n", user->n);
 }
 void * SendAll(void * args)
 {

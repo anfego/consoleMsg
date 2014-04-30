@@ -109,3 +109,11 @@ void clearStatus(userInfo * users, int chatIndex)
 {
 	((users+chatIndex)->status) = 0;
 }
+void setChatKeyD(userInfo * users, int chatIndex, char * d)
+{
+	memcpy((users+chatIndex)->d, d, 300*sizeof(char));
+}
+void setChatKeyN(userInfo * users, int chatIndex, char * n)
+{
+	memcpy((users+chatIndex)->n, n, 300*sizeof(char));
+}

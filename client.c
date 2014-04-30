@@ -212,7 +212,7 @@ int login(int socketHandler)
 	size = strlen(buf2);
 	buf2[size] = '@';
 	bdConvToHex(n, buf2+size+1, BUF_SIZE);
-	printf("KEYS OUT\n\t\t\t%s\n",buf2);
+	// printf("KEYS OUT\n\t\t\t%s\n",buf2);
 	sendMsg(buf2,socketHandler,"/lg");
 	
 	return 0;
@@ -352,12 +352,6 @@ void * chat (void * chatInfo)
 	if (amIClient((users+chat)) == CLIENT)
 	{
 		(users+chat)->socketHandler = createSocket((users+chat)->name, (users+chat)->port);
-		//set chat keys as its own
-		memset((users+chat)->d, '\0', BUF_SIZE*sizeof(char));
-		memset((users+chat)->n, '\0', BUF_SIZE*sizeof(char));
-		bdConvToHex(d, (users+chat)->d, BUF_SIZE);
-		bdConvToHex(n, (users+chat)->n, BUF_SIZE);
-		
 	}
 	else
 	{
@@ -494,7 +488,7 @@ void * clientEngine(void * socketIn)
 					sscanf(msg,"%s %s %s",users[index].name, users[index].d, users[index].n);
 
 					// memcpy(users[index].name, msg, strlen(msg)*sizeof(char));
-					printf("KEY received for %d:\t%s\n", index, users[index].d);
+					// printf("KEY received for %d:\t%s\n", index, users[index].d);
 					
 						
 					
@@ -532,7 +526,8 @@ void * clientEngine(void * socketIn)
 			{
 
 				int port;
-				
+				char dTemp[300], nTemp[300];
+
 				// extract information from msg
 				deserializer2(msg,source,msg);
 				index = findNiceSpot(users,MAX_USERS);
@@ -546,11 +541,23 @@ void * clientEngine(void * socketIn)
 
 				setPort(users,index,port);
 				setRole(users,index,CLIENT);
+				printf("\nRECIEVED IN /SO %s\n", msg );
+				memset(users[index].d, '\0', 300*sizeof(char));
+				memset(users[index].n, '\0', 300*sizeof(char));
 
-				
+				sscanf(msg,"%d %s %s",&port, users[index].d, users[index].n);
+				setChatKeyD(users, index, users[index].d);
+				setChatKeyN(users, index, users[index].n);
+				// bdConvToHex(d, (users+chat)->d, BUF_SIZE);
+				// bdConvToHex(n, (users+chat)->n, BUF_SIZE);
 
-				// printUserInfo(&users[index]);
+				printf("\n");
+				printf("\n");
 
+				printUserInfo(&users[index]);
+
+				printf("\n");
+				printf("\n");
 				
 				if ((error = pthread_create(
 										&(users[index].userPThread),

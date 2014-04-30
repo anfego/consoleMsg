@@ -42,5 +42,7 @@ void setRole(userInfo * users, int chatIndex, int role);
 void setPort(userInfo * users, int chatIndex, int port);
 void setStatus(userInfo * users, int chatIndex);
 void clearStatus(userInfo * users, int chatIndex);
+void setChatKeyN(userInfo * users, int chatIndex, char * n);
+void setChatKeyD(userInfo * users, int chatIndex, char * d);
 
 #endif
