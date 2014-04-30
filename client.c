@@ -404,20 +404,19 @@ void * chat (void * chatInfo)
 				// on = bdNew();
 				// bdConvFromHex(on, users[chat].n);
 				// bdConvFromHex(oe, users[chat].d);
-<<<<<<< HEAD
-				Decryptor(msg, msg, n, e);
+
+				// Decryptor(msg, msg, n, e);
 				// bdFree(&oe);
 				// bdFree(&on);
 				//got encrypted message	
-/*=======
+// =======
 				Decryptor(msg, msg, e, n);
 				// bdFree(&oe);
 				// bdFree(&on);
 			//got encrypted message	
->>>>>>> 4f6a033c2e783386f1679b2f9e8523787712a8c5*/
+// >>>>>>> 4f6a033c2e783386f1679b2f9e8523787712a8c5
 				printf("received: %s\n", msg);
 
-				}
 
 			}
 			else if(strncmp(cmd,"/cn",3) == 0)
@@ -460,7 +459,7 @@ void * clientEngine(void * socketIn)
 	char source[20];
 	char msg[1400];
 	
-	int n, index;
+	int received, index, i;
 	struct sockaddr_in sad; /* structure to hold an IP address */
 	
 	while(1)
@@ -469,9 +468,10 @@ void * clientEngine(void * socketIn)
 		memset(buf, '\0', 1400*sizeof(char));
 		memset(cmd, '\0', 4*sizeof(char));
 
-		n = recv(socket, buf, sizeof(buf), 0);
+		received = recv(socket, buf, sizeof(buf), 0);
+
 		
-		if(n > 0)
+		if(received > 0)
 		{
 		
 			memset(cmd,'\0',4*sizeof(char));
@@ -488,6 +488,14 @@ void * clientEngine(void * socketIn)
 			{
 				/*kill current connection*/
 				printf("exiting.");
+				for (i = MAX_USERS-1; i >= 0; --i)
+				{							//send to all clients
+					if(users[i].status == 1)
+					{
+						pthread_cancel(users[i].userPThread);
+						closeConnection(users[i].socketHandler);
+					}
+				}
 				closesocket(socket);
 				printf(" .\n");
 				fflush(stdout);
